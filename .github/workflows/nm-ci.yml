@@ -1,0 +1,91 @@
+name: nm-ci
+
+# CI enxuto do NM Connect (fork de melgarafael/DeskcommCRM).
+#
+# Os workflows do upstream (acolhida, ci, e2e, perf, publish-image, release,
+# relogio, vigia-de-colisao) ficam DESABILITADOS neste repositório via API, sem
+# editar os arquivos — editar arquivo do upstream gera conflito a cada sync. Eles
+# dependem de infra que não temos (executor próprio, GHCR, secrets, Supabase no
+# CI) ou fazem trabalho de release do produto deles.
+#
+# Este workflow roda só o que dá sinal de código sem secrets nem serviço:
+# typecheck, lint, lint:channels, lint:role-rank, cercas estruturais e a suíte
+# unitária (`--project produto`) em 3 partes — mesma forma do `verify-parte` de
+# ci.yml. O status check obrigatório da `main` é o job `nm-ci-ok`.
+#
+# Fora daqui (de propósito, por enquanto): test:db (Postgres + invariantes RLS),
+# e2e, build de imagem, kit bash (test:shell).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # Partes: 1 = typecheck + auditorias + unit 1/3; 2 = lint + unit 2/3;
+  # 3 = cercas + unit 3/3. `--project produto` é o `pnpm test:unit` menos as
+  # cercas, que rodam uma vez só, na parte 3.
+  verify:
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    # Concurrency por job (não por workflow): o agregador `nm-ci-ok` roda com
+    # `if: always()` e, num grupo de workflow, seguraria o grupo — ver o
+    # cabeçalho de ci.yml. Em PR, push novo cancela o run antigo; na main, não.
+    concurrency:
+      group: ${{ github.workflow }}-verify${{ matrix.parte }}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v7
+
+      # Node 22, pnpm da versão em `packageManager` (pnpm/action-setup), cache
+      # pnpm e `pnpm install --frozen-lockfile`.
+      - uses: ./.github/actions/preparar-node
+        timeout-minutes: 5
+
+      - name: Typecheck
+        if: matrix.parte == 1
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: pnpm typecheck
+
+      - name: Channel provider leak
+        if: matrix.parte == 1
+        run: pnpm lint:channels
+
+      - name: Role rank audit
+        if: matrix.parte == 1
+        run: pnpm lint:role-rank
+
+      - name: Lint
+        if: matrix.parte == 2
+        run: pnpm lint
+
+      - name: Cercas estruturais
+        if: matrix.parte == 3
+        run: pnpm cercas
+
+      - name: Unit tests (parte ${{ matrix.parte }}/3)
+        run: pnpm test:unit --project produto --shard=${{ matrix.parte }}/3
+
+  # O NOME DESTE JOB É O STATUS CHECK OBRIGATÓRIO. Sem concurrency, de
+  # propósito; `skipped` e `cancelled` reprovam — parte que não rodou não mediu.
+  nm-ci-ok:
+    if: always()
+    needs: [verify]
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Falhar se qualquer parte não passou
+        env:
+          VERIFY: ${{ needs.verify.result }}
+        run: |
+          echo "verify: ${VERIFY}"
+          [ "$VERIFY" = "success" ]
