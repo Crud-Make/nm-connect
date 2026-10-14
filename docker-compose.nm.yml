@@ -1,0 +1,38 @@
+# NM Connect — override para subir a stack de produção SEM o WAHA.
+#
+# O NM Connect fala com o WhatsApp só pela Cloud API oficial da Meta. O WAHA
+# (WhatsApp Web não oficial) não é usado, e este arquivo o tira do caminho sem
+# editar nenhum arquivo do upstream (melgarafael/DeskcommCRM):
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.nm.yml --env-file .env up -d
+#
+# Com proxy da hospedagem (Traefik), a ordem é a mesma, acrescentando o arquivo:
+#
+#   docker compose -f docker-compose.prod.yml -f docker-compose.traefik.yml \
+#     -f docker-compose.nm.yml --env-file .env up -d
+#
+# Este arquivo SÓ resolve o compose. O app ainda exige as variáveis WAHA_* em
+# produção (lib/env.ts) — os valores neutros e o porquê de cada um estão em
+# `.env.nm.example`. Detalhes e o que validar: docs/nm/sem-waha.md.
+#
+# Requer Docker Compose >= 2.24.4 (tag `!override`).
+
+services:
+  app:
+    # No prod.yml o app tem `depends_on: waha`. Dependência em serviço que não
+    # sobe (profile inativo) impede o app de subir — o mesmo aviso que o
+    # prod.yml escreve ao lado do `wacalls`. `!override` troca o mapa inteiro em
+    # vez de mesclar, e o que sobra é a única dependência real: o srh.
+    depends_on: !override
+      srh:
+        condition: service_started
+
+  waha:
+    # Mesmo mecanismo do `wacalls` e da `telefonia` no prod.yml: sem o profile
+    # ativo, o Compose nem cria o contêiner. Para religar (diagnóstico,
+    # migração), `COMPOSE_PROFILES=waha` — e aí também é preciso apontar
+    # WAHA_API_BASE_URL/WAHA_API_KEY de verdade no .env.
+    #
+    # ⚠️ Nomear o serviço (`up -d waha`) ATIVA o profile e sobe o contêiner
+    # mesmo com COMPOSE_PROFILES vazio. Não faça isso por engano.
+    profiles: ["waha"]
