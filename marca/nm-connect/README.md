@@ -3,7 +3,7 @@
 CRM de WhatsApp com agentes de IA, da casa NM (irmão do NM ONE). Tom: profissional,
 confiável, sóbrio — atendimento jurídico e empresarial.
 
-![Logo](png/logo.png)
+![Logo](logo.png)
 
 ## O símbolo
 
@@ -20,9 +20,9 @@ O wordmark é Inter (SIL OFL 1.1) convertida em contornos: **NM** em 700, **Conn
 
 | Arquivo | Uso |
 |---|---|
-| `logo.svg` / `png/logo.png` | Logo horizontal para fundo claro (PNG com 192 px de altura, fundo transparente) |
-| `logo-escuro.svg` / `png/logo-escuro.png` | Logo para fundo escuro ("NM" em `#EF6B63`, "Connect" em `#F2F0EA`) |
-| `icone.svg` / `png/icone-512.png` | Símbolo quadrado; legível a 16–32 px (aba, app instalado) |
+| `logo.svg` / `logo.png` | Logo horizontal para fundo claro (PNG com 192 px de altura, fundo transparente) |
+| `logo-escuro.svg` / `logo-escuro.png` | Logo para fundo escuro ("NM" em `#EF6B63`, "Connect" em `#F2F0EA`) |
+| `icone.svg` / `icone-512.png` | Símbolo quadrado; legível a 16–32 px (aba, app instalado) |
 | `paleta.md` | Cores, justificativa e contraste WCAG medido |
 | `gerar.py` | Regera os três SVGs (precisa de `fonttools`; instruções no cabeçalho) |
 | `evidencias/` | Telas do sistema com a marca aplicada, claro e escuro; `erro-x-marca-*` comparam a marca com estados de erro e botão destrutivo; `grafite-2B2A27-recusado-*` mostram o grafite neutro recusado |
@@ -48,9 +48,9 @@ Entre como super-admin e abra **`/admin/marca`**:
 1. **Nome do sistema:** `NM Connect`
 2. **Cor da marca:** `#33363D` (grafite: a interface é grafite; o vermelho fica no logo)
 3. **Cor da marca no tema escuro:** `#C9CDD4`
-4. **Logo:** suba `png/logo.png` (sobe na hora, não depende do Salvar)
-5. **Logo para o tema escuro:** suba `png/logo-escuro.png`
-6. **Ícone do aplicativo e do navegador:** suba `png/icone-512.png`
+4. **Logo:** suba `logo.png` (sobe na hora, não depende do Salvar)
+5. **Logo para o tema escuro:** suba `logo-escuro.png`
+6. **Ícone do aplicativo e do navegador:** suba `icone-512.png`
 7. Clique **Salvar** (grava nome e cores).
 
 A tela só aceita **PNG ou JPG até 512 KB** — SVG é recusado pelos bytes, de propósito
@@ -66,7 +66,7 @@ e a paleta não precisou de ajuste fino.
 APP_NAME="NM Connect"
 APP_ACCENT_HEX=#33363D
 # Opcional — o logo subido pela tela vence esta URL:
-APP_LOGO_URL=https://raw.githubusercontent.com/Crud-Make/nm-connect/main/marca/nm-connect/png/logo.png
+APP_LOGO_URL=https://raw.githubusercontent.com/Crud-Make/nm-connect/main/marca/nm-connect/logo.png
 ```
 
 São **semente** (instalação nova já nasce com a marca) e **piso de rollback** (o
