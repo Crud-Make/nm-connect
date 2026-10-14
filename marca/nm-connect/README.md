@@ -25,15 +25,16 @@ O wordmark é Inter (SIL OFL 1.1) convertida em contornos: **NM** em 700, **Conn
 | `icone.svg` / `png/icone-512.png` | Símbolo quadrado; legível a 16–32 px (aba, app instalado) |
 | `paleta.md` | Cores, justificativa e contraste WCAG medido |
 | `gerar.py` | Regera os três SVGs (precisa de `fonttools`; instruções no cabeçalho) |
-| `evidencias/` | Telas do sistema com a marca aplicada, claro e escuro; `erro-x-marca-*` comparam a marca com estados de erro e botão destrutivo |
+| `evidencias/` | Telas do sistema com a marca aplicada, claro e escuro; `erro-x-marca-*` comparam a marca com estados de erro e botão destrutivo; `grafite-2B2A27-recusado-*` mostram o grafite neutro recusado |
 
 Regras rápidas: não recolorir o símbolo fora da paleta; não esticar (o logo tem
 proporção ~4,8:1 e a barra lateral o mostra com 28 px de altura); manter o ladrilho
 vermelho com balão branco nos dois temas — é o que torna o ícone reconhecível na aba.
 
-> ⚠️ **Vermelho × erro.** O vermelho da marca cai no mesmo matiz que o sistema usa para
-> erro e ação destrutiva (`--color-error: #a94a3c`), e esta versão do produto não afasta
-> um do outro sozinha. Medição, telas e saídas possíveis em [`paleta.md`](paleta.md#️-risco-marca-vermelha--cor-de-erroação-destrutiva).
+> **Regra de cor:** vermelho `#B3261E` e branco são a marca, só no logo e no ícone. A
+> interface é grafite (`#33363D` / `#C9CDD4`), e o vermelho na interface fica reservado
+> para erro e perigo. Grafite neutro demais (ex.: `#2B2A27`) é recusado pelo sistema, que
+> volta à cor padrão; ver [`paleta.md`](paleta.md).
 
 ## Como aplicar numa instalação
 
@@ -45,8 +46,8 @@ serve qualquer marca, e o banco manda sobre o `.env`. Nada aqui edita arquivo do
 Entre como super-admin e abra **`/admin/marca`**:
 
 1. **Nome do sistema:** `NM Connect`
-2. **Cor da marca:** `#B3261E`
-3. **Cor da marca no tema escuro:** `#EF6B63`
+2. **Cor da marca:** `#33363D` (grafite: a interface é grafite; o vermelho fica no logo)
+3. **Cor da marca no tema escuro:** `#C9CDD4`
 4. **Logo:** suba `png/logo.png` (sobe na hora, não depende do Salvar)
 5. **Logo para o tema escuro:** suba `png/logo-escuro.png`
 6. **Ícone do aplicativo e do navegador:** suba `png/icone-512.png`
@@ -63,7 +64,7 @@ e a paleta não precisou de ajuste fino.
 
 ```bash
 APP_NAME="NM Connect"
-APP_ACCENT_HEX=#B3261E
+APP_ACCENT_HEX=#33363D
 # Opcional — o logo subido pela tela vence esta URL:
 APP_LOGO_URL=https://raw.githubusercontent.com/Crud-Make/nm-connect/main/marca/nm-connect/png/logo.png
 ```

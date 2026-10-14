@@ -1,83 +1,65 @@
-# Paleta do NM Connect — vermelho e branco
+# Paleta do NM Connect
+
+**Regra:** vermelho e branco são a **marca**: só no logo e no ícone. A **interface** é
+grafite. Vermelho na interface fica **reservado para erro e perigo**.
 
 | Papel | Hex | Onde entra |
 |---|---|---|
-| **Accent** (tema claro) | `#B3261E` | `/admin/marca` → "Cor da marca"; `APP_ACCENT_HEX` |
-| **Accent escuro** (tema escuro) | `#EF6B63` | `/admin/marca` → "Cor da marca no tema escuro" |
-| Branco (balão do símbolo) | `#FFFFFF` | só nos arquivos de logo/ícone |
-| Tinta (texto "Connect", claro) | `#1B1A17` | só nos arquivos de logo |
-| Papel (texto "Connect", escuro) | `#F2F0EA` | só nos arquivos de logo |
+| Vermelho da marca (claro) | `#B3261E` | só `logo.svg`, `icone.svg` e PNGs |
+| Vermelho da marca (escuro) | `#EF6B63` | só `logo-escuro.svg` ("NM") |
+| Branco | `#FFFFFF` | balão do símbolo |
+| **Accent da interface** (tema claro) | `#33363D` | `/admin/marca` → "Cor da marca"; `APP_ACCENT_HEX` |
+| **Accent da interface** (tema escuro) | `#C9CDD4` | `/admin/marca` → "Cor da marca no tema escuro" |
+| Tinta / Papel (texto "Connect") | `#1B1A17` / `#F2F0EA` | só nos arquivos de logo |
 
-Os neutros e fundos (`#faf9f6` no claro, `#161510` no escuro) são do design system
-(`app/globals.css`) e **não** mudam por marca.
+Fundos (`#faf9f6` claro, `#161510` escuro) e a cor de erro (`--color-error: #a94a3c` /
+`#c87263`) são do design system (`app/globals.css`) e não mudam por marca.
 
-## Por que este vermelho
+## Por que `#33363D` e não `#2B2A27`
 
-- `#B3261E` é um vermelho puro e fechado (OKLCH L 0,50 · C 0,18 · H 28,7°): nem
-  alaranjado nem rosado, escuro o bastante para ler como sóbrio/institucional.
-- `#EF6B63` é o mesmo matiz (H 25,8°), mais claro, para não afundar no fundo escuro
-  (o `#B3261E` faz só 2,80:1 sobre `#161510`).
-- O sistema deriva sozinho a escala `--color-accent-50…950` (`lib/branding/css.ts`). No
-  escuro ele pousou os botões em `#FF7F75`, com texto preto.
+O primeiro grafite pedido foi `#2B2A27` / `#E8E6E0`. A tela salvou, mas **o sistema
+recusa accent acromático**: *"Sua cor é um tom neutro (cinza, preto ou branco), e uma cor
+assim não destaca nada na tela. Os botões seguem com a cor padrão do sistema"*. Na
+prática a interface voltou para o verde-sálvia do produto original (`#506d48` no claro e
+`#82a077` no escuro, medidos no DOM). Quem decide é a guarda de acromaticidade
+(`separacaoDoNeutro` em `lib/branding/contraste.ts`): `#2B2A27` tem croma OKLCH de 0,006
+e some nos neutros quentes do produto. Evidência: `evidencias/grafite-2B2A27-recusado-*.png`.
+
+`#33363D` / `#C9CDD4` é um **grafite frio** (croma 0,013, matiz azulado 267°). A
+diferença para o `#2B2A27` é pequena (ΔE OKLab 0,051), mas basta para o sistema aceitar.
+A tela confirma: *"No modo escuro, os botões usam exatamente a sua cor"*.
 
 ## Contraste (WCAG 2.x, fórmula de luminância relativa)
 
-| Par | Razão | AA texto (4,5) |
+| Par | Razão |
+|---|---|
+| Branco sobre `#33363D` (botão, tema claro) | **12,10:1** |
+| `#33363D` sobre o fundo `#faf9f6` | **11,49:1** |
+| Texto escuro `#161510` sobre `#C9CDD4` (botão, tema escuro) | **11,46:1** |
+| `#C9CDD4` sobre o fundo `#161510` | **11,46:1** |
+| Medido pela tela `/admin/marca` (texto sobre botão) | **12,1:1** no claro, **13,2:1** no escuro |
+| Vermelho `#B3261E` sobre `#faf9f6` · branco sobre `#B3261E` (logo/ícone) | 6,21 · 6,54 |
+| `#EF6B63` sobre `#161510` (logo escuro) | 6,05 |
+
+## Marca × erro: resolvido
+
+| | Accent × erro, contraste | ΔE OKLab |
 |---|---|---|
-| Branco sobre `#B3261E` (botão, tema claro) | **6,54:1** | passa |
-| `#B3261E` sobre fundo claro `#faf9f6` | **6,21:1** | passa |
-| `#EF6B63` sobre fundo escuro `#161510` | **6,05:1** | passa |
-| `#161510` sobre `#EF6B63` | 6,05:1 | passa |
-| Preto sobre `#FF7F75` (botão real no tema escuro, medido no DOM) | 8,54:1 | passa |
-| Tinta `#1B1A17` sobre `#faf9f6` · Papel `#F2F0EA` sobre `#161510` | 16,53 · 16,04 | passa |
+| Antes (accent vermelho `#B3261E` × `#a94a3c`) | 1,16:1 | 0,058 |
+| Antes, escuro (botão `#FF7F75` × `#c87263`) | 1,41:1 | 0,108 |
+| **Agora** (`#33363D` × `#a94a3c`) | **2,15:1** | **0,239** |
+| **Agora, escuro** (`#C9CDD4` × `#c87263`) | **2,18:1** | **0,235** |
 
-Medido pela própria tela `/admin/marca` depois de salvar: **6,5:1 no claro** e
-**8,5:1 no escuro** (texto em cima dos botões).
-
-## ⚠️ Risco: marca vermelha × cor de erro/ação destrutiva
-
-**Os tokens de erro são independentes do accent, mas têm praticamente a mesma cor.**
-
-- `app/globals.css`: `--color-error: #a94a3c` (claro) / `#c87263` (escuro), com
-  `--color-error-bg` e `--color-error-fg`; `--color-destructive: var(--color-error)`.
-  O botão `variant="destructive"` é `bg-error text-white` (`components/ui/button.tsx`).
-  O botão primário é `--color-primary: var(--color-accent)`. Ou seja: variáveis
-  separadas, nenhuma deriva da outra — mas a nossa marca caiu no mesmo matiz.
-- Medido (OKLab): accent `#B3261E` × error `#a94a3c` → matiz 28,7° × 30,4°, ΔE 0,058,
-  contraste entre os dois **1,16:1**. No escuro, botão `#FF7F75` × error `#c87263` →
-  ΔE 0,108, contraste **1,41:1**. (Com o azul anterior o ΔE era 0,246.)
-- O motor de derivação **detecta** a colisão e quer girar as semânticas para longe, mas
-  esta versão não emite esse giro no CSS (`token_nao_serializado`, `css.ts`). A própria
-  tela avisa depois de salvar: *"Sua cor ficou parecida com a que o sistema usa para
-  indicar atenção, erro e sucesso. Nesta versão ele ainda não afasta esses tons
-  sozinho"*.
-- Evidência em `evidencias/erro-x-marca-*.png`:
-  - **login com senha errada**: a caixa "Email ou senha incorretos" (error) fica logo
-    acima do botão "Entrar" (marca). Mesma família, distinguíveis só pelo formato (caixa
-    clara × botão cheio).
-  - **Configurações › Organização**: "Salvar" e "Aplicar interface" (primários) ficam
-    na mesma tela que "Apagar todos os dados de atendimento" (destrutivo). No claro o
-    destrutivo é só um pouco mais terroso; **no escuro o "Salvar" (`#FF7F75`) chama
-    mais atenção que o próprio botão de apagar (`#c87263`)**. O item ativo do menu e o
-    interruptor ligado também ficam vermelhos.
-
-**Conclusão:** dá para distinguir **pelo texto e pelo contexto**, não pela cor. O
-vermelho deixa de sinalizar perigo: toda ação comum fica com cara de destrutiva.
-Saídas possíveis, sem editar o upstream (decisão do Thiago):
-
-1. **Vermelho só na identidade** (logo, ícone, materiais) e accent da interface em
-   neutro escuro (grafite, por ex. `#2B2A27` / `#E8E6E0` no escuro). A marca continua
-   vermelha e branca em tudo que se vê primeiro; a UI preserva o vermelho para erro.
-2. **Manter o vermelho como accent** (aplicado hoje) e aceitar a ambiguidade, que o
-   texto dos botões e as confirmações de ação destrutiva (diálogo) mitigam.
-3. Contribuir no upstream a serialização das semânticas deslocadas — aí o próprio
-   sistema giraria o erro para longe da marca.
-
-O CSS personalizado da tela não resolve: mexer em `.bg-error` tiraria o erro do
-vermelho, que é pior.
+Além da luminância, a separação agora é de **matiz e croma**: o grafite é quase sem cor
+(C ≈ 0,01) e o erro é vermelho (C ≈ 0,12). O aviso *"Sua cor ficou parecida com a que o
+sistema usa para indicar atenção, erro e sucesso"* **sumiu** depois de salvar. Nas telas
+`evidencias/erro-x-marca-*.png`, "Salvar"/"Aplicar interface" (grafite) e "Apagar todos
+os dados de atendimento" (vermelho) não se confundem, e o alerta de senha errada é a
+única coisa vermelha no login além do logo.
 
 ## Como aplicar
 
-1. `/admin/marca` → Cor da marca `#B3261E`, Cor no tema escuro `#EF6B63` → **Salvar**.
-2. Semente no `.env` do servidor: `APP_ACCENT_HEX=#B3261E`.
+1. `/admin/marca` → Cor da marca `#33363D`, Cor no tema escuro `#C9CDD4` → **Salvar**.
+   Logo, logo escuro e ícone são os PNGs vermelhos.
+2. Semente no `.env` do servidor: `APP_ACCENT_HEX=#33363D`.
 3. Não há variável de ambiente para o accent escuro: ele vive só no banco (tela).
