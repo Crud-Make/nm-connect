@@ -9,9 +9,9 @@ os SVGs não dependem de fonte instalada. Requer `fonttools` (num venv qualquer)
 
 PNGs (a tela /admin/marca só aceita PNG/JPG):
 
-    rsvg-convert -h 192 logo.svg -o png/logo.png
-    rsvg-convert -h 192 logo-escuro.svg -o png/logo-escuro.png
-    rsvg-convert -w 512 -h 512 icone.svg -o png/icone-512.png
+    rsvg-convert -h 192 logo.svg -o logo.png
+    rsvg-convert -h 192 logo-escuro.svg -o logo-escuro.png
+    rsvg-convert -w 512 -h 512 icone.svg -o icone-512.png
 """
 import re
 import sys
