@@ -234,6 +234,19 @@ const GATILHO_ESPERADO: Record<string, { condicao: string | null; efeito: string
     condicao: null,
     efeito: "Este é o check obrigatório `build-and-size` (`pnpm build` em Node 22).",
   },
+  "nm-ci.yml::verify": {
+    condicao: null,
+    efeito:
+      "São as partes do CI enxuto do fork NM Connect (typecheck, lint, cercas e unit em " +
+      "3 shards). Uma condição aqui deixaria as partes `skipped`, e o agregador `nm-ci-ok` " +
+      "só aceita `success`.",
+  },
+  "nm-ci.yml::nm-ci-ok": {
+    condicao: "always()",
+    efeito:
+      "Este é o check obrigatório `nm-ci-ok` do fork NM Connect, a fachada da matriz " +
+      "`verify`. Precisa de `always()` para ler o resultado das partes e reprovar `skipped`.",
+  },
 
   // --- e o que legitimamente tem interruptor -----------------------------------
   "acolhida.yml::acolher": {
