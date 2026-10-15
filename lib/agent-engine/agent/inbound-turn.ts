@@ -1808,6 +1808,24 @@ export async function deteccoesDeterministicasDoAssistido(
 }
 
 /**
+ * TETO DE CADA ETAPA DAS CHAMADAS DE MODELO DO TURNO (abertura, correção do
+ * turno mudo e fechamento). Sem ele um provider pendurado prendia o turno até o
+ * `QUEUE_VISIBILITY_TIMEOUT_MS` (600 s): nem o `fetch` contido do provider nem
+ * o AI SDK têm prazo próprio. E pior que a espera: vencido o prazo da fila, o
+ * job é re-claimado e roda DE NOVO enquanto o primeiro ainda pode acordar.
+ *
+ * Por que 120 s: uma etapa é UMA ida ao modelo (com as re-tentativas do SDK)
+ * mais as tools dela — envio com pausa humana e throttle, RAG, CRM. A etapa
+ * saudável mais lenta (mídia nativa — áudio, PDF, imagem — num modelo que
+ * raciocina) fica na casa de dezenas de segundos; 120 s dá folga de sobra a ela
+ * e ainda fica 5× abaixo do prazo da fila. Estourado, a chamada falha pelo
+ * caminho de sempre (`llm_calls` com `provedor_indisponivel`, erro relançado,
+ * `failJob` com backoff); o que já saiu foi pelo `send_ledger`, que o re-run
+ * não repete.
+ */
+export const TETO_POR_ETAPA_DO_TURNO_MS = 120_000;
+
+/**
  * O NÚCLEO DO TURNO, SEMPRE SOB A ESCOLTA DO ORÇAMENTO.
  *
  * Esta função é o único ponto do produto por onde os três kinds de turno de
@@ -4635,6 +4653,7 @@ async function executarTurnoDoAgente(
         messages: openingMessages,
         tools,
         maxSteps,
+        tetoPorEtapaMs: TETO_POR_ETAPA_DO_TURNO_MS,
         // Rascunho: a resposta é o send_message ACEITO; a etapa seguinte só
         // "encerrava". Aceito, e não chamado: o envio vetado pela cadeia
         // before_send volta ao modelo para ele reescrever (o 1º veto ensina).
@@ -4718,6 +4737,7 @@ async function executarTurnoDoAgente(
           messages: [...openingMessages, ...turn.result.responseMessages, pedidoDeCorrecao],
           tools,
           maxSteps: Math.min(maxSteps, 3),
+          tetoPorEtapaMs: TETO_POR_ETAPA_DO_TURNO_MS,
           ...(agentConfig !== null
             ? {
                 model: agentConfig.model,
@@ -4872,6 +4892,7 @@ async function executarTurnoDoAgente(
             leadId: leadId || null,
             jobId: job?.id,
             purpose: 'checkpoint',
+            tetoPorEtapaMs: TETO_POR_ETAPA_DO_TURNO_MS,
             ...(agentConfig !== null
               ? {
                   model: agentConfig.model,
