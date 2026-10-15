@@ -22,6 +22,7 @@ export interface ConexaoExternaRow {
   max_response_bytes: number;
   customer_key_column: string | null;
   customer_key_kind: TipoDeIdentificador | null;
+  require_cpf_check: boolean;
   last_tested_at: string | null;
   last_test_ok: boolean | null;
   last_test_error: string | null;
@@ -70,6 +71,7 @@ export interface EntradaDeConexao {
   max_response_bytes: number;
   customer_key_column: string | null;
   customer_key_kind: TipoDeIdentificador | null;
+  require_cpf_check: boolean;
 }
 
 export type PatchDeConexao = Partial<Omit<EntradaDeConexao, "password">> & {

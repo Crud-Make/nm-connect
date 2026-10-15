@@ -103,3 +103,58 @@ describe("coluna que identifica o cliente", () => {
     expect(atualizarConexaoSchema.safeParse({ label: "x" }).success).toBe(true);
   });
 });
+
+describe("require_cpf_check — a trava do CPF exige a chave do cliente por TELEFONE", () => {
+  it("nasce desligada: conexão existente/nova não muda de comportamento", () => {
+    expect(criarConexaoSchema.parse(VALIDO).require_cpf_check).toBe(false);
+  });
+
+  it("ligada com a chave por telefone: aceita", () => {
+    const r = criarConexaoSchema.parse({
+      ...VALIDO,
+      require_cpf_check: true,
+      customer_key_column: "telefone",
+      customer_key_kind: "phone",
+    });
+    expect(r.require_cpf_check).toBe(true);
+  });
+
+  it("ligada sem chave do cliente: recusa, apontando o campo", () => {
+    const r = criarConexaoSchema.safeParse({ ...VALIDO, require_cpf_check: true });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues.some((i) => i.path.includes("require_cpf_check"))).toBe(true);
+  });
+
+  it("ligada com a chave por e-mail: recusa (a conferência é pelo telefone da conversa)", () => {
+    const r = criarConexaoSchema.safeParse({
+      ...VALIDO,
+      require_cpf_check: true,
+      customer_key_column: "email",
+      customer_key_kind: "email",
+    });
+    expect(r.success).toBe(false);
+  });
+
+  it("atualização: ligar junto com chave e-mail ou chave nula recusa; sem tocar na chave, decide o banco (CHECK)", () => {
+    expect(
+      atualizarConexaoSchema.safeParse({
+        require_cpf_check: true,
+        customer_key_column: null,
+        customer_key_kind: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      atualizarConexaoSchema.safeParse({
+        require_cpf_check: true,
+        customer_key_column: "email",
+        customer_key_kind: "email",
+      }).success,
+    ).toBe(false);
+    expect(atualizarConexaoSchema.safeParse({ require_cpf_check: true }).success).toBe(true);
+    expect(atualizarConexaoSchema.safeParse({ require_cpf_check: false }).success).toBe(true);
+  });
+
+  it("só aceita booleano", () => {
+    expect(criarConexaoSchema.safeParse({ ...VALIDO, require_cpf_check: "sim" }).success).toBe(false);
+  });
+});

@@ -151,6 +151,7 @@ export function ListaDeConexoes({ initialData, canWrite }: Props) {
                   {conexao.label}
                 </Link>
                 <EstadoDaConexao conexao={conexao} />
+                {conexao.require_cpf_check && <Badge variant="outline">{t("Confere CPF")}</Badge>}
               </div>
               <p className="truncate text-sm text-muted-foreground">
                 {conexao.host}:{conexao.port}/{conexao.database_name} · {conexao.username}

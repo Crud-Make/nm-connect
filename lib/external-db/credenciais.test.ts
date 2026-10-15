@@ -81,9 +81,23 @@ describe("carregarConexao", () => {
         maxFilters: 40,
         maxResponseBytes: 120000,
         chaveDoCliente: null,
+        exigeConferenciaDeCpf: false,
         versao: "2026-09-11T00:00:00.000Z",
       },
     });
+  });
+
+  it("a trava do CPF só vale com true literal (ausente = desligada)", async () => {
+    const ligada = adminFalso({
+      data: { ...LINHA, customer_key_column: "telefone", customer_key_kind: "phone", require_cpf_check: true },
+      error: null,
+    });
+    const r = await carregarConexao(ligada.admin, "org-1", "conn-1");
+    expect(r.ok && r.conexao.exigeConferenciaDeCpf).toBe(true);
+
+    const nula = adminFalso({ data: { ...LINHA, require_cpf_check: null }, error: null });
+    const r2 = await carregarConexao(nula.admin, "org-1", "conn-1");
+    expect(r2.ok && r2.conexao.exigeConferenciaDeCpf).toBe(false);
   });
 
   it("a coluna que identifica o cliente só vale com o tipo junto", async () => {

@@ -40,6 +40,12 @@ export interface ConexaoExterna {
    * contato do turno; `null` = não configurada, e a consulta segue sem esse filtro.
    */
   chaveDoCliente: ChaveDoCliente | null;
+  /**
+   * A trava do CPF (`require_cpf_check`). Ligada, a consulta do agente na
+   * conversa só sai depois de o contato do turno passar pela conferência
+   * (`lib/external-db/conferencia-de-cpf.ts`). Fora do turno, nada muda.
+   */
+  exigeConferenciaDeCpf: boolean;
   versao: string;
 }
 

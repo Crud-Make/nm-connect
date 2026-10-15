@@ -193,6 +193,8 @@ export async function negocioDaEscritaDoTurno(
 const HANDOFF_TOOL_NAME = "crm_request_human_handoff";
 const DRAFT_PROPOSAL_TOOL_NAME = "crm_draft_proposal";
 const PREPARAR_PROPOSTA_TOOL_NAME = "crm_preparar_proposta";
+const QUERY_EXTERNAL_DATA_TOOL_NAME = "crm_query_external_data";
+const CONFIRM_IDENTITY_TOOL_NAME = "crm_confirm_customer_identity";
 
 function shapeToZodObject(shape: Record<string, z.ZodTypeAny>): z.ZodTypeAny {
   // The MCP tool inputSchema is a Zod *raw shape* (object of zod types).
@@ -606,6 +608,22 @@ export function pickToolsFromMcp(input: PickToolsInput): Record<string, Tool> {
       if (tool) {
         result[nome] = wrapMcpTool(tool, input, executarEscrita);
       }
+    }
+  }
+
+  // A conferência de CPF anda com a busca no banco externo (a trava do CPF,
+  // #18): numa conexão que exige conferência, a busca recusa até o contato
+  // acertar os dígitos, e é esta ferramenta que libera. Sem ela no turno, ligar
+  // a trava na tela deixaria o assistente sem saída. Os mesmos filtros de
+  // módulo e de capacidade da organização valem para ela.
+  if (result[QUERY_EXTERNAL_DATA_TOOL_NAME] && !result[CONFIRM_IDENTITY_TOOL_NAME]) {
+    const conferencia = allTools.find((t) => t.name === CONFIRM_IDENTITY_TOOL_NAME);
+    if (
+      conferencia &&
+      !deModuloDesligado(conferencia.name, input.modulosLigados ?? []) &&
+      !deCapacidadeDesligada(conferencia.name, input.capacidadesLigadas ?? [])
+    ) {
+      result[CONFIRM_IDENTITY_TOOL_NAME] = wrapMcpTool(conferencia, input, executarEscrita);
     }
   }
 
