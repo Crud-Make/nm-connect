@@ -10,6 +10,7 @@ const TODOS: SendTemplateResult[] = [
   { sent: false, reason: "missing" },
   { sent: false, reason: "not_approved" },
   { sent: false, reason: "api_error", code: 132000, message: "params não batem" },
+  { sent: false, reason: "timeout" },
 ];
 
 describe("explainSendResult — o que o modelo lê", () => {

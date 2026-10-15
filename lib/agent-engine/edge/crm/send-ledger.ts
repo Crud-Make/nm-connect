@@ -3,6 +3,7 @@ import { OrgNaoOperanteError } from "@/lib/organizacao/operante";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Queryable } from "../../queue/queue";
+import { METADATA_ENTREGA_INCERTA } from "@/lib/channels/erro-de-envio";
 
 export type SendLedgerStatus = "requested" | "accepted" | "queued" | "vetoed" | "failed";
 export type SendOutcome =
@@ -15,6 +16,8 @@ export type SendOutcome =
   | { kind: "blocked"; idempotencyKey: string };
 type Intent = { tenantId: string; leadId: string | null; jobId: string; seq: number; body: string };
 type Row = { id: string; status: SendLedgerStatus; crm_message_id: string | null };
+/** `entregaIncerta`: a linha carrega `metadata.entrega_incerta` (ver `erro-de-envio.ts`). */
+type MensagemDoRecibo = { id: string; status: string; entregaIncerta?: boolean };
 interface LedgerStore {
   create(input: Intent, hash: string): Promise<string>;
   find(input: Intent): Promise<Row | null>;
@@ -22,7 +25,7 @@ interface LedgerStore {
   /** Pela PK primeiro: o envio grava `messages.id = chave` (`internalMessageId`). O
    * `metadata->>'idempotency_key'` não tem índice e só alcança linha gravada antes
    * dessa convenção, então fica de reserva para quando a PK não acha. */
-  message(org: string, key: string): Promise<{ id: string; status: string } | null>;
+  message(org: string, key: string): Promise<MensagemDoRecibo | null>;
   update(
     org: string,
     key: string,
@@ -56,8 +59,17 @@ export async function sendWithLedger(
     if (prior.status === "accepted")
       return { kind: "already_sent", idempotencyKey: key, crmMessageId: prior.crm_message_id };
     if (prior.status === "vetoed") return { kind: "blocked", idempotencyKey: key };
-    if (prior.status === "failed") key = await store.rotate(input, hash);
-    else replay = true;
+    if (prior.status === "failed") {
+      // Falha com desfecho DESCONHECIDO (o canal não respondeu a tempo) não
+      // ganha tentativa nova: a mensagem pode ter chegado ao cliente, e
+      // rotacionar a chave aqui é o retry do job reenviando. Envio em dobro é
+      // pior que não-envio — fica `failed`, e quem decide reenviar é gente.
+      const anterior = await store.message(input.tenantId, prior.id);
+      if (anterior?.status === "failed" && anterior.entregaIncerta === true) {
+        return { kind: "failed", idempotencyKey: prior.id, crmMessageId: anterior.id };
+      }
+      key = await store.rotate(input, hash);
+    } else replay = true;
   }
   const existing = replay ? await store.message(input.tenantId, key) : null;
   let message = existing;
@@ -133,8 +145,9 @@ export function pgSendLedger(db: Queryable): LedgerStore {
       return rows[0].id;
     },
     async message(org, key) {
-      const { rows } = await db.query<{ id: string; status: string }>(
-        "select id,status from messages where organization_id=$1 and id=$2",
+      const { rows } = await db.query<MensagemDoRecibo>(
+        `select id,status,coalesce(metadata->>'${METADATA_ENTREGA_INCERTA}' = 'true', false) as "entregaIncerta"
+           from messages where organization_id=$1 and id=$2`,
         [org, key],
       );
       if (rows[0]) return rows[0];
@@ -202,12 +215,19 @@ export function supabaseSendLedger(db: SupabaseClient): LedgerStore {
     async message(org, key) {
       const porId = await db
         .from("messages")
-        .select("id,status")
+        .select("id,status,metadata")
         .eq("organization_id", org)
         .eq("id", key)
         .maybeSingle();
       if (porId.error) throw porId.error;
-      if (porId.data) return porId.data;
+      if (porId.data) {
+        const { id, status, metadata } = porId.data as {
+          id: string;
+          status: string;
+          metadata: Record<string, unknown> | null;
+        };
+        return { id, status, entregaIncerta: metadata?.[METADATA_ENTREGA_INCERTA] === true };
+      }
       const { data, error } = await db
         .from("messages")
         .select("id,status")

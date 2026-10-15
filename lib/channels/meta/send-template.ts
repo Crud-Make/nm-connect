@@ -24,6 +24,7 @@ import {
 } from "./template-binding";
 import { deriveTemplateContract } from "./template-contract";
 import { graphBaseUrl } from "./graph-base";
+import { ehTempoEsgotado, GRAPH_TIMEOUT_ENVIO_MS } from "./erros-da-graph";
 
 export interface SendTemplateInput {
   phoneNumberId: string;
@@ -64,6 +65,9 @@ export type SendTemplateResult =
   // por construção, em vez de exigir um `default` que engoliria caso novo em silêncio.
   | { sent: false; reason: Exclude<BindingState, "ok"> }
   | { sent: false; reason: "missing_values"; missing: string[] }
+  // A Graph não respondeu dentro do teto. Desfecho DESCONHECIDO — o modelo pode
+  // ter saído —, e por isso não é `api_error`: quem chama não pode reenviar.
+  | { sent: false; reason: "timeout" }
   | { sent: false; reason: "api_error"; code: number | null; message: string };
 
 interface GraphResponse {
@@ -116,25 +120,34 @@ export async function sendTemplate(input: SendTemplateInput): Promise<SendTempla
 
   const base = input.graphBase ?? graphBaseUrl(input.graphVersion);
   const url = `${base}/${input.phoneNumberId}/messages`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${input.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to: input.to,
-      type: "template",
-      template: {
-        name: input.binding.name,
-        language: { code: input.binding.language },
-        // Template sem parâmetro nenhum NÃO leva `components` — mandar um array
-        // vazio é recusado pela Meta.
-        ...(components.length > 0 ? { components } : {}),
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${input.token}`,
+        "Content-Type": "application/json",
       },
-    }),
-  });
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: input.to,
+        type: "template",
+        template: {
+          name: input.binding.name,
+          language: { code: input.binding.language },
+          // Template sem parâmetro nenhum NÃO leva `components` — mandar um array
+          // vazio é recusado pela Meta.
+          ...(components.length > 0 ? { components } : {}),
+        },
+      }),
+      // Mesmo teto do envio de texto (`erros-da-graph.ts`): sem ele uma Graph
+      // pendurada segurava o turno e a request para sempre.
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_ENVIO_MS),
+    });
+  } catch (err) {
+    if (ehTempoEsgotado(err)) return { sent: false, reason: "timeout" };
+    throw err;
+  }
 
   const body = (await res.json().catch(() => ({}))) as GraphResponse;
   if (!res.ok || body.error) {

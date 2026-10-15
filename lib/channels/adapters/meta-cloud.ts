@@ -22,6 +22,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { metaContactsPayload } from "@/lib/channels/meta/contact-card";
 import { graphBaseUrl } from "@/lib/channels/meta/graph-base";
+import { postarMensagemNaGraph } from "@/lib/channels/meta/erros-da-graph";
 import { resolveMetaCreds } from "../meta/credentials";
 import type {
   ChannelAdapter,
@@ -341,35 +342,21 @@ export const metaCloudAdapter: ChannelAdapter = {
       { type: "text", text: { body: envelope.body ?? "" } };
 
     await envelope.beforeSend?.();
-    const res = await fetch(
-      `${graphBaseUrl()}/${creds.phoneNumberId}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${creds.token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: envelope.to,
-          ...corpo,
-        }),
+    // Teto de espera e erro classificado por código moram em
+    // `meta/erros-da-graph.ts`: uma Graph pendurada segurava o turno do agente e
+    // a request para sempre, e todo erro virava o genérico `meta_error`. O tempo
+    // esgotado sai como natureza `incerta` — `failed`, sem reenvio automático,
+    // porque abortar a espera não prova que a Meta não entregou.
+    return postarMensagemNaGraph({
+      url: `${graphBaseUrl()}/${creds.phoneNumberId}/messages`,
+      token: creds.token,
+      corpo: {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: envelope.to,
+        ...corpo,
       },
-    );
-
-    const body = (await res.json().catch(() => ({}))) as {
-      messages?: { id?: string }[];
-      error?: { code?: number; message?: string; error_data?: { details?: string } };
-    };
-
-    if (!res.ok || body.error) {
-      // `details` é o campo que diz QUAL parâmetro divergiu; sem ele o operador lê
-      // "Parameter format does not match" e não tem pista nenhuma.
-      const detalhe = body.error?.error_data?.details ?? body.error?.message ?? `http_${res.status}`;
-      throw new Error(`meta_${body.error?.code ?? res.status}: ${detalhe}`);
-    }
-
-    return { externalId: body.messages?.[0]?.id ?? null };
+      prefixo: "meta",
+    });
   },
 };
