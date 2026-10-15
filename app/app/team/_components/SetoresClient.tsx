@@ -224,7 +224,7 @@ function EditorDeSetor({
               <ul className="max-h-64 space-y-1 overflow-y-auto rounded-md border p-2">
                 {equipe.map((pessoa) => (
                   <li key={pessoa.id}>
-                    <label className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-1 text-sm hover:bg-muted">
                       <input
                         type="checkbox"
                         className="size-4 accent-primary"

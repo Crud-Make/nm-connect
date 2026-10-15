@@ -54647,4 +54647,10 @@ create policy tenant_isolation_setor_membros_all on public.setor_membros
   with check (organization_id in (select public.fn_user_org_ids())
               and public.fn_role_at_least(organization_id, 'manager'));
 
+-- Travas do modo somente leitura do suporte (`support_write_*`, migration
+-- 0274): a varredura roda de novo DEPOIS de as duas tabelas existirem, para a
+-- primeira aplicação (o install.sh) já chegar ao mesmo conjunto que a segunda.
+-- Idempotente: a função derruba e recria as três políticas de cada tabela.
+do $f$ begin perform public.fn_aplicar_travas_de_suporte(); end $f$;
+
 notify pgrst, 'reload schema';
