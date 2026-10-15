@@ -11,8 +11,11 @@
  * e é por isso que `costCents` recebe o TTL em vigor em vez de supor a doutrina.
  *
  * Modelo fora da tabela → custo NULL (desconhecido): mais honesto que inventar 0 —
- * o budget soma coalesce(cost_cents, 0), então modelo sem preço não consome teto;
- * quem habilitar um modelo novo para uma org adiciona a linha de preço aqui.
+ * o budget soma coalesce(cost_cents, 0), então modelo sem preço não consome teto.
+ * O seam não para aqui: `custo-da-chamada.ts` prefere o custo que o provedor
+ * informou (OpenRouter, `usage.cost`) e, quando esta tabela devolve NULL, cai no
+ * preço do catálogo (`ai_models`). Esta tabela segue a régua de Anthropic,
+ * OpenAI e Gemini — é a única que sabe preço de cache por TTL.
  *
  * TRÊS armadilhas já pagas, e as três são do MESMO defeito — a tabela ficou na
  * geração 4 enquanto o catálogo (`ai_models`, migration 0101) andou:
