@@ -48,6 +48,8 @@ import { useFollowupFlows } from "@/hooks/followup/useFollowupFlows";
 // #2155 — funil/etapa de DESTINO da intenção: o card vai para o funil do produto.
 import { usePipelines, usePipelineStages } from "@/hooks/webhooks/useWebhookSources";
 import { useT } from "@/hooks/i18n/useT";
+// 0675 — setor para onde a intenção leva a conversa.
+import { useSetores } from "@/hooks/team/useSetores";
 
 interface AgentLite {
   id: string;
@@ -100,6 +102,7 @@ function camposDoMembro(m: {
   flow_pointer_id?: string | null;
   pipeline_id?: string | null;
   stage_id?: string | null;
+  setor_id?: string | null;
 }): RouterMemberInput {
   return {
     agent_id: m.agent_id,
@@ -109,6 +112,7 @@ function camposDoMembro(m: {
     flow_pointer_id: m.flow_pointer_id ?? null,
     pipeline_id: m.pipeline_id ?? null,
     stage_id: m.stage_id ?? null,
+    setor_id: m.setor_id ?? null,
   };
 }
 
@@ -236,6 +240,7 @@ export function RouterEditorClient({
         flow_pointer_id: null,
         pipeline_id: null,
         stage_id: null,
+        setor_id: null,
       },
     ]);
   }
@@ -593,6 +598,60 @@ function DestinoDoCard({
   );
 }
 
+/**
+ * 0675 — o SETOR para onde a intenção leva a conversa. Quando a intenção casa
+ * com confiança, a conversa passa a ser do setor e, na passagem para humano,
+ * só membros dele a recebem (sem ninguém do setor de plantão, ela espera na
+ * fila). Sem setor, a intenção não mexe no setor da conversa.
+ */
+function SetorDaIntencao({
+  setorId,
+  disabled,
+  onChange,
+}: {
+  setorId: string | null;
+  disabled: boolean;
+  onChange: (patch: Partial<DraftMember>) => void;
+}) {
+  const t = useT();
+  const { data } = useSetores();
+  const setores = data?.data ?? [];
+  return (
+    <div className="space-y-1" data-testid="seletor-de-setor">
+      <Label>{t("Setor (opcional)")}</Label>
+      <Select
+        value={setorId ?? NONE}
+        onValueChange={(v) => onChange({ setor_id: v === NONE ? null : v })}
+        disabled={disabled}
+      >
+        <SelectTrigger aria-label={t("Setor (opcional)")}>
+          <SelectValue placeholder={t("Sem setor — qualquer atendente")} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={NONE}>{t("Sem setor — qualquer atendente")}</SelectItem>
+          {setores.map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              {s.nome}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">
+        {setores.length === 0 ? (
+          <>
+            {t("Nenhum setor criado ainda.")}{" "}
+            <Link href="/app/team?aba=setores" className="underline">
+              {t("Criar setores em Equipe")}
+            </Link>
+          </>
+        ) : (
+          t("Quando esta intenção casar, só quem é do setor recebe a conversa ao passar para um atendente.")
+        )}
+      </p>
+    </div>
+  );
+}
+
 function IntentRow({
   member,
   agents,
@@ -701,6 +760,7 @@ function IntentRow({
         disabled={disabled}
         onChange={onChange}
       />
+      <SetorDaIntencao setorId={member.setor_id ?? null} disabled={disabled} onChange={onChange} />
       <ExamplesInput
         value={member.examples}
         onChange={(examples) => onChange({ examples })}

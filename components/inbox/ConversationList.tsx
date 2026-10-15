@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useChannelSessions } from "@/hooks/channels/useChannelSessions";
 
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
+import { nomesDosSetores, useSetores } from "@/hooks/team/useSetores";
 
 import { ConversationListItem } from "./ConversationListItem";
 import { EmptyInbox } from "@/components/empty";
@@ -62,6 +63,10 @@ export function ConversationList({
   // Uma leitura por lista, compartilhada por todas as linhas (react-query dedupa
   // com o cabeçalho, que faz a mesma pergunta).
   const automaticoDaOrg = useAutomaticoAtivo();
+  // Setores (migration 0675): UMA consulta para a lista inteira; cada linha só
+  // procura o nome no mapa.
+  const { data: setoresRes } = useSetores();
+  const nomeDoSetor = useMemo(() => nomesDosSetores(setoresRes?.data), [setoresRes]);
 
   // Sem filtro de cliente: TODO filtro é parâmetro do schema e roda no banco.
   // `clientFilter` era o mecanismo que permitia um filtro existir fora do contrato
@@ -196,6 +201,7 @@ export function ConversationList({
             mostrarAtendente={mostrarAtendente}
             mostrarAutomatico={mostrarAutomatico}
             automaticoDaOrg={automaticoDaOrg.data}
+            nomeDoSetor={c.setor_id ? (nomeDoSetor.get(c.setor_id) ?? null) : null}
           />
         ))}
         {q.hasNextPage && (

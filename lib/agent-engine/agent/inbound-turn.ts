@@ -213,6 +213,7 @@ import { CORRECAO_DO_TURNO_MUDO, turnoMudoPedeCorrecao } from './turno-mudo';
 import { emitAgentActivityForContact } from '@/lib/leads/agent-activity';
 import { resolveActiveLeadForContact, type LeadCandidate } from '@/lib/leads/active-lead';
 import { aplicaDestinoDaIntencao } from './destino-da-intencao';
+import { gravaSetorDaConversa, setorParaGravar } from './setor-da-intencao';
 import { recalculaScoreDoLead } from '@/lib/leads/score-writer';
 import {
   JAILBREAK_ESCALATION_LEVEL,
@@ -2307,6 +2308,28 @@ async function executarTurnoDoAgente(
     } catch (err) {
       runLog.warn('decisão do router não gravada', {
         error: (err instanceof Error ? err.message : String(err)).slice(0, 120),
+      });
+    }
+  }
+  // 0675 — A INTENÇÃO TAMBÉM DIZ O SETOR. Gravado antes do turno do agente:
+  // se ele passar a conversa para humano neste mesmo turno, o roteamento já
+  // escolhe entre os membros do setor. Só decisão nova com confiança grava
+  // (regra e porquê em `setor-da-intencao.ts`). Fire-and-forget como a
+  // telemetria acima: falhar aqui nunca derruba a resposta ao lead.
+  const setorDaIntencao = preview ? null : setorParaGravar(routed);
+  if (setorDaIntencao !== null) {
+    try {
+      const mudou = await gravaSetorDaConversa(pool, tenantId, input.conversationId, setorDaIntencao);
+      if (mudou) {
+        runLog.info('setor da conversa definido pela intenção', {
+          setor_id: setorDaIntencao,
+          intent: routed.intentName,
+        });
+      }
+    } catch (err) {
+      runLog.warn('setor da intenção não gravado', {
+        error: (err instanceof Error ? err.message : String(err)).slice(0, 120),
+        setor_id: setorDaIntencao,
       });
     }
   }

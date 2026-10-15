@@ -87,7 +87,7 @@ it("uses the transactional shared lock when a DB URL is configured", async () =>
     db,
     id,
     id,
-    [{ ...member, flow_pointer_id: null, pipeline_id: null, stage_id: null }],
+    [{ ...member, flow_pointer_id: null, pipeline_id: null, stage_id: null, setor_id: null }],
     "replace",
   );
   expect(db.query.mock.calls.map(([sql]) => sql)).toEqual(["begin", "commit"]);
@@ -133,6 +133,22 @@ it("refuses a destination stage without its pipeline before touching the databas
   const response = await PUT(request([{ ...member, stage_id: id }]), {
     params: Promise.resolve({ id }),
   });
+  expect(response.status).toBe(422);
+  expect(mocks.pool).not.toHaveBeenCalled();
+});
+it("passes the intent's setor through to the writer (0675)", async () => {
+  vi.stubEnv("SUPABASE_DB_URL", "postgresql://local-test");
+  const db = { query: vi.fn().mockResolvedValue({ rows: [] }), release: vi.fn() };
+  mocks.pool.mockReturnValue({ connect: async () => db });
+  const response = await PUT(request([{ ...member, setor_id: id }]), { params: Promise.resolve({ id }) });
+  expect(response.status).toBe(200);
+  expect(mocks.write.mock.calls.at(-1)?.[3]).toEqual([
+    { ...member, flow_pointer_id: null, pipeline_id: null, stage_id: null, setor_id: id },
+  ]);
+});
+it("answers 422 when the setor is not a uuid, before touching the database (0675)", async () => {
+  vi.stubEnv("SUPABASE_DB_URL", "postgresql://local-test");
+  const response = await PUT(request([{ ...member, setor_id: "tributario" }]), { params: Promise.resolve({ id }) });
   expect(response.status).toBe(422);
   expect(mocks.pool).not.toHaveBeenCalled();
 });

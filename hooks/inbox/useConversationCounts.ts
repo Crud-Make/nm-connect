@@ -40,6 +40,8 @@ export interface FiltrosDaContagem {
   /** E ou OU entre as etiquetas escolhidas (#1274). `e` é o padrão. */
   tagMode?: ModoDeEtiqueta;
   channel_session_id?: string;
+  /** O setor (migration 0675) — o badge conta o MESMO recorte da lista. */
+  setor_id?: string;
 }
 
 /**
@@ -60,6 +62,7 @@ export function useConversationCounts(
   // URL sem mudar o sentido do filtro.
   if (filtros.tagMode === "ou") qs.set("modo", "ou");
   if (filtros.channel_session_id) qs.set("channel_session_id", filtros.channel_session_id);
+  if (filtros.setor_id) qs.set("setor_id", filtros.setor_id);
   const sufixo = qs.toString();
 
   return useQuery({

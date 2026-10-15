@@ -1697,8 +1697,8 @@ export const DICIONARIO: Traducoes = {
   "Por onde e sobre o quê você quer ser avisado.": {
     es: "Por dónde y sobre qué quieres recibir avisos.",
   },
-  "Quem trabalha aqui, com qual papel e quanta conversa cada um aguenta.": {
-    es: "Quién trabaja aquí, con qué rol y cuántas conversaciones puede tomar cada uno.",
+  "Quem trabalha aqui, com qual papel, em que setor e quanta conversa cada um aguenta.": {
+    es: "Quién trabaja aquí, con qué rol, en qué sector y cuántas conversaciones puede tomar cada uno.",
   },
   "Quem recebe cada cliente novo, e o que cada atendente enxerga.": {
     es: "Quién recibe cada cliente nuevo y qué ve cada asesor.",
@@ -14545,6 +14545,9 @@ export const DICIONARIO: Traducoes = {
   "Iniciar outro fluxo de atendimento": { es: "Iniciar otro flujo de atención" },
   "O fluxo de atendimento escolhido não existe nesta organização.": { es: "El flujo de atención elegido no existe en esta organización." },
   "O funil ou a etapa de destino não existe nesta organização.": { es: "El embudo o la etapa de destino no existe en esta organización." },
+  "O funil, a etapa ou o setor de destino não existe nesta organização.": {
+    es: "El embudo, la etapa o el sector de destino no existe en esta organización.",
+  },
   "Como usar os fluxos de atendimento (guia rápido)": { es: "Cómo usar los flujos de atención (guía rápida)" },
   "É um roteiro de perguntas que a IA segue durante a conversa: ela pergunta uma coisa por vez, entende a resposta e guarda o dado no cadastro do cliente.": { es: "Es un guion de preguntas que la IA sigue durante la conversación: pregunta una cosa a la vez, entiende la respuesta y guarda el dato en el registro del cliente." },
   "Montando o roteiro": { es: "Armando el guion" },
@@ -15486,6 +15489,39 @@ export const DICIONARIO: Traducoes = {
   "Escondido, o campo não aparece no formulário nem é validado como obrigatório, e o valor já gravado continua no registro.": {
     es: "Oculto, el campo no aparece en el formulario ni se valida como obligatorio, y el valor ya guardado sigue en el registro.",
   },
+  // Setores do atendimento (migration 0675).
+  "As conversas e as intenções do roteador que apontam para este setor ficam sem setor. Nenhuma conversa é apagada.": { es: "Las conversaciones y las intenciones del enrutador que apuntan a este sector quedan sin sector. No se borra ninguna conversación." },
+  "Criar setores em Equipe": { es: "Crear sectores en Equipo" },
+  "Dê um nome à área e marque quem atende por ela.": { es: "Ponle un nombre al área y marca quién la atiende." },
+  "Editar setor": { es: "Editar sector" },
+  "Erro ao carregar os setores.": { es: "Error al cargar los sectores." },
+  "Erro ao criar o setor.": { es: "Error al crear el sector." },
+  "Erro ao excluir o setor.": { es: "Error al eliminar el sector." },
+  "Erro ao salvar o setor.": { es: "Error al guardar el sector." },
+  "Ex.: Tributário": { es: "Ej.: Tributario" },
+  "Excluir setor": { es: "Eliminar sector" },
+  "Excluir setor?": { es: "¿Eliminar sector?" },
+  "Filtrar por setor": { es: "Filtrar por sector" },
+  "Já existe um setor com este nome.": { es: "Ya existe un sector con este nombre." },
+  "Nenhum setor ainda. Crie um para o roteador de IA poder encaminhar conversas por área.": { es: "Todavía no hay sectores. Crea uno para que el enrutador de IA pueda dirigir conversaciones por área." },
+  "Nenhum setor criado ainda.": { es: "Todavía no se creó ningún sector." },
+  "Ninguém da equipe atende conversas ainda.": { es: "Nadie del equipo atiende conversaciones todavía." },
+  "Nome do setor": { es: "Nombre del sector" },
+  "Novo setor": { es: "Nuevo sector" },
+  "Quando esta intenção casar, só quem é do setor recebe a conversa ao passar para um atendente.": { es: "Cuando esta intención coincida, solo quien es del sector recibe la conversación al pasarla a un agente." },
+  "Sem membros — enquanto estiver vazio, o setor não restringe quem recebe.": { es: "Sin miembros: mientras esté vacío, el sector no restringe quién recibe." },
+  "Sem setor — qualquer atendente": { es: "Sin sector: cualquier agente" },
+  "Setor": { es: "Sector" },
+  "Setor (opcional)": { es: "Sector (opcional)" },
+  "Setor criado.": { es: "Sector creado." },
+  "Setor excluído.": { es: "Sector eliminado." },
+  "Setor não encontrado.": { es: "Sector no encontrado." },
+  "Setor removido": { es: "Sector eliminado" },
+  "Setor salvo.": { es: "Sector guardado." },
+  "Setores": { es: "Sectores" },
+  "Setores agrupam quem atende cada área. Quando o roteador de IA leva a conversa para um setor, só os membros dele a recebem; se ninguém do setor estiver de plantão, ela espera na fila.": { es: "Los sectores agrupan a quienes atienden cada área. Cuando el enrutador de IA lleva la conversación a un sector, solo sus miembros la reciben; si nadie del sector está de guardia, espera en la cola." },
+  "Todos os setores": { es: "Todos los sectores" },
+  "Um dos membros não faz parte desta organização.": { es: "Uno de los miembros no forma parte de esta organización." },
 };
 
 /**

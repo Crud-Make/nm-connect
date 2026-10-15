@@ -14,11 +14,21 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { carregarCargaERodizio } from "./carga";
 import { isAttendantEligible } from "./eligibility";
+import { restringirAoSetor } from "./setor";
 import type { RoutingCandidate } from "./decide";
 import { availabilityScheduleSchema } from "@/lib/schemas/routing";
 
 export type RoutingScope =
-  | { kind: "conversation_channel"; channelSessionId: string }
+  | {
+      kind: "conversation_channel";
+      channelSessionId: string;
+      /**
+       * Setor da conversa (`conversations.setor_id`). Presente e com membros ⇒
+       * só membros do setor recebem; ninguém elegível ⇒ [] e a conversa fica na
+       * fila (regra em `./setor.ts`). Ausente/null ⇒ comportamento de antes.
+       */
+      setorId?: string | null;
+    }
   | { kind: "organization_summary" };
 export class InvalidRoutingChannel extends Error {
   constructor() { super("routing_channel_invalid"); }
@@ -47,6 +57,14 @@ export async function loadEligibleAttendants(
       allowed = new Set((responsibles ?? []).map((r: { user_id: string }) => r.user_id));
       // Policy existente vazia é restrição explícita, não ausência de configuração.
       if (allowed.size === 0) return [];
+    }
+    if (scope.setorId) {
+      const { data: membros, error: setorError } = await supabase.from("setor_membros")
+        .select("user_id").eq("organization_id", organizationId).eq("setor_id", scope.setorId);
+      if (setorError) throw new Error(setorError.message);
+      allowed = restringirAoSetor(allowed, (membros ?? []).map((r: { user_id: string }) => r.user_id));
+      // Setor com membros e nenhum deles permitido pelo canal: fila, não outro setor.
+      if (allowed !== null && allowed.size === 0) return [];
     }
   }
   const { data: members, error: memberError } = await supabase.from("user_organizations")

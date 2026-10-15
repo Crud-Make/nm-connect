@@ -34,6 +34,7 @@ import { useAuth } from "@/hooks/auth/AuthProvider";
 import { useContactTagVocabulary } from "@/hooks/contacts/useContactTagVocabulary";
 import { useConversationTagVocabulary } from "@/hooks/inbox/useConversationTags";
 import { useConversationCounts } from "@/hooks/inbox/useConversationCounts";
+import { useSetores } from "@/hooks/team/useSetores";
 import type { Role, VisibilityMode } from "@/lib/auth/types";
 
 export type InboxTab = "unassigned" | "mine" | "all" | "closed" | "archived" | "ai";
@@ -80,6 +81,8 @@ export interface InboxFiltersValue {
   search: string;
   onlyUnread: boolean;
   channel_session_id?: string;
+  /** O setor da conversa (migration 0675). */
+  setor_id?: string;
   /**
    * A etiqueta escolhida, ou VÁRIAS (#1274).
    *
@@ -202,7 +205,16 @@ export function InboxFilters({ value, onChange }: Props) {
     tag: etiquetas,
     tagMode: value.tagMode,
     channel_session_id: value.channel_session_id,
+    setor_id: value.setor_id,
   });
+  // O filtro de SETOR (migration 0675). Mesma válvula do canal: um setor
+  // excluído com o filtro ainda ligado continua aparecendo no seletor, como
+  // "Setor removido", para o operador conseguir desligá-lo.
+  const { data: setoresRes } = useSetores();
+  const setores = setoresRes?.data ?? [];
+  const setorForaDaLista =
+    value.setor_id != null && setoresRes != null && !setores.some((s) => s.id === value.setor_id);
+  const mostrarSeletorDeSetor = setores.length > 0 || value.setor_id != null;
 
   const tabs = activeOrg
     ? visibleInboxTabs(activeOrg.role, activeOrg.visibility_mode)
@@ -428,8 +440,35 @@ export function InboxFilters({ value, onChange }: Props) {
           </button>
         </div>
 
-        {(showChannelSwitch || mostrarSeletorDeTag) && (
+        {(showChannelSwitch || mostrarSeletorDeTag || mostrarSeletorDeSetor) && (
           <div className="flex gap-2">
+            {mostrarSeletorDeSetor && (
+              <Select
+                value={value.setor_id ?? "all"}
+                onValueChange={(v) => onChange({ ...value, setor_id: v === "all" ? undefined : v })}
+              >
+                <SelectTrigger
+                  className={cn(
+                    "h-8 min-w-0 flex-1 rounded-full border-transparent bg-surface-elevated px-3 text-xs shadow-none",
+                    value.setor_id != null && "border-accent bg-accent-soft text-accent",
+                  )}
+                  aria-label={t("Filtrar por setor")}
+                >
+                  <SelectValue placeholder={t("Todos os setores")} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("Todos os setores")}</SelectItem>
+                  {setorForaDaLista && value.setor_id != null && (
+                    <SelectItem value={value.setor_id}>{t("Setor removido")}</SelectItem>
+                  )}
+                  {setores.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.nome}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {showChannelSwitch && (
               <Select
                 value={value.channel_session_id ?? "all"}

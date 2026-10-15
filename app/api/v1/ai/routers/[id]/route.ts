@@ -26,7 +26,7 @@ const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const ROUTER_DETAIL_COLUMNS = "id, name, channel_session_id, is_active, config, fallback_agent_id";
 const MEMBER_COLUMNS =
-  "id, agent_id, intent_name, intent_description, examples, position, flow_pointer_id, pipeline_id, stage_id";
+  "id, agent_id, intent_name, intent_description, examples, position, flow_pointer_id, pipeline_id, stage_id, setor_id";
 
 const patchRouterSchema = z.object({
   name: z.string().min(1).max(120).optional(),

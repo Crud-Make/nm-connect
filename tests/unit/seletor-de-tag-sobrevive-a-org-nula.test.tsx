@@ -32,6 +32,12 @@ import type { ActiveOrg } from "@/lib/auth/types";
 const activeOrgRef: { current: ActiveOrg | null } = { current: null };
 const tagsRef: { current: string[] } = { current: [] };
 
+// Setores (migration 0675): a inbox nomeia e filtra por setor. Sem setor
+// nenhum na organização, o filtro e os selos não aparecem — a tela de sempre.
+vi.mock("@/hooks/team/useSetores", async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  useSetores: () => ({ data: undefined }),
+}));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useAuth: () => ({ activeOrg: activeOrgRef.current }),
 }));

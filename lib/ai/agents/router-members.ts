@@ -11,6 +11,8 @@ export interface RouterMemberInput {
   pipeline_id?: string | null;
   /** Etapa de destino dentro de `pipeline_id`; `null` = primeira etapa aberta. */
   stage_id?: string | null;
+  /** Setor para onde a intenção leva a conversa (0675). `null` = não muda o setor. */
+  setor_id?: string | null;
 }
 
 /**
@@ -70,8 +72,8 @@ export async function writeRouterMembers(
       if (existing.rows.length) continue;
     }
     await db.query(
-      `insert into ai_router_members(organization_id,router_id,agent_id,intent_name,intent_description,examples,flow_pointer_id,pipeline_id,stage_id,position)
-       select $1,$2,$3,$4,$5,$6,$7,$8,$9,coalesce(max(position)+1,0) from ai_router_members where organization_id=$1 and router_id=$2`,
+      `insert into ai_router_members(organization_id,router_id,agent_id,intent_name,intent_description,examples,flow_pointer_id,pipeline_id,stage_id,setor_id,position)
+       select $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,coalesce(max(position)+1,0) from ai_router_members where organization_id=$1 and router_id=$2`,
       [
         orgId,
         routerId,
@@ -82,6 +84,7 @@ export async function writeRouterMembers(
         member.flow_pointer_id ?? null,
         member.pipeline_id ?? null,
         member.stage_id ?? null,
+        member.setor_id ?? null,
       ],
     );
   }

@@ -24,6 +24,8 @@ export interface RouterMember {
   /** Funil de DESTINO do card quando a intenção casa (#2155). `null` = só roteia. */
   pipeline_id: string | null;
   stage_id: string | null;
+  /** Setor para onde a intenção leva a conversa (0675). `null` = não muda o setor. */
+  setor_id?: string | null;
 }
 
 export interface RouterMemberInput {
@@ -35,6 +37,8 @@ export interface RouterMemberInput {
   /** Funil de DESTINO do card quando a intenção casa (#2155). `null` = só roteia. */
   pipeline_id: string | null;
   stage_id: string | null;
+  /** Setor da intenção (0675). Opcional: o SSR legado chega sem o campo. */
+  setor_id?: string | null;
 }
 
 export interface RouterDetail {

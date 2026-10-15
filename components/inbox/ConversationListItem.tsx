@@ -62,6 +62,12 @@ interface Props {
    * afirme nada".
    */
   automaticoDaOrg?: boolean;
+  /**
+   * Nome do setor da conversa (migration 0675), resolvido UMA vez pela lista
+   * (`useSetores`), nunca por linha. Sempre mostrado quando existe: é o que diz
+   * de quem uma conversa parada na Fila está esperando.
+   */
+  nomeDoSetor?: string | null;
 }
 
 /**
@@ -135,6 +141,7 @@ export function ConversationListItem({
   mostrarAtendente,
   mostrarAutomatico = true,
   automaticoDaOrg,
+  nomeDoSetor,
 }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
@@ -222,6 +229,7 @@ export function ConversationListItem({
   const rotuloCanal = rotuloDoCanalDaConversa(canal, t);
 
   const temSelos =
+    Boolean(nomeDoSetor) ||
     visibleTags.length > 0 ||
     (mostrarAtendente && comando.quem === "humano") ||
     (mostrarCanal && rotuloCanal != null) ||
@@ -344,6 +352,15 @@ export function ConversationListItem({
 
         {temSelos && (
           <div className="mt-1.5 flex flex-wrap items-center gap-1">
+            {nomeDoSetor && (
+              <Badge
+                variant="secondary"
+                className="h-4 min-w-0 max-w-[9rem] truncate px-1.5 text-[10px] font-medium"
+                title={`${t("Setor")} ${nomeDoSetor}`}
+              >
+                <span className="truncate">{nomeDoSetor}</span>
+              </Badge>
+            )}
             {visibleTags.map((t) => (
               <ChipDeEtiqueta key={t} tag={t} className="h-4 px-1.5 text-[10px]" />
             ))}
