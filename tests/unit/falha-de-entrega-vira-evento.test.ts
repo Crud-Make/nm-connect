@@ -124,7 +124,9 @@ describe("falha de entrega emite message.failed", () => {
     // avisaria o integrador de novo sobre a mesma falha. Coberto na fonte
     // porque montar a rota inteira em teste custaria um dublê de NextRequest +
     // HMAC para provar UMA cláusula — e o que importa é que ela esteja lá.
-    const rota = readFileSync("app/api/v1/webhooks/meta/[token]/route.ts", "utf8");
+    // O processamento saiu da rota para `processar-webhook.ts` (a rota e o cron
+    // `webhook-replay` o compartilham); é lá que o ramo mora agora.
+    const rota = readFileSync("lib/channels/meta/processar-webhook.ts", "utf8");
     const inicio = rota.indexOf('e.status === "failed"');
     expect(inicio, "o ramo de recusa sumiu da rota do webhook").toBeGreaterThan(-1);
     const ramo = rota.slice(inicio);

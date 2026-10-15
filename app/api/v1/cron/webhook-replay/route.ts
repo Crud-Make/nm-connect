@@ -5,7 +5,9 @@
  * A rota do webhook do canal por QR devolve 503 quando o banco falha de forma
  * transitória e o transporte reentrega por alguns segundos; o que não entrar
  * nessa janela fica no arquivo marcado `transitoria:`, e este cron o reprocessa
- * a cada minuto. A regra inteira (espera, teto de tentativas, desistência com
+ * a cada minuto. A rota da Meta responde 200 (a Meta reentrega em backoff, não
+ * em segundos) e marca `transitoria:` toda ingestão que falhou — para ela, este
+ * cron é a única nova tentativa. A regra inteira (espera, teto de tentativas, desistência com
  * aviso na Central, parada na terceira falha seguida) mora em
  * `lib/channels/reprocessar-arquivo-de-webhook.ts`; aqui ficam só a
  * autenticação e a auditoria.

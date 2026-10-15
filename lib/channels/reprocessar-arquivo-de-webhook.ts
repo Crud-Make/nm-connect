@@ -1,6 +1,8 @@
 /**
- * Reprocessa o arquivo de webhook do canal por QR que o banco recusou por um
- * instante — o corpo do cron `app/api/v1/cron/webhook-replay`.
+ * Reprocessa o arquivo de webhook que o banco recusou por um instante — o corpo
+ * do cron `app/api/v1/cron/webhook-replay`. Atende o canal por QR e o canal
+ * oficial da Meta (`PROVEDORES_COM_REPLAY`); cada um entra pela própria
+ * ingestão, e o resto (espera, teto, desistência com aviso, parada) é comum.
  *
  * Mora em `lib/channels/` porque precisa nomear o transporte (a ingestão, o
  * contrato do envelope, o valor de `provider` no arquivo), e esta é a fronteira
@@ -23,14 +25,27 @@
  *   - para na terceira falha transitória seguida da rodada: se o banco ainda não
  *     voltou, martelar as outras linhas só gasta o banco que está se recuperando.
  *
+ * ─── O canal oficial da Meta ────────────────────────────────────────────────
+ *
+ * A Meta não aceita 503 como pedido de reentrega curta: ela reentrega em
+ * backoff, e a rota responde 200 para não entrar nesse laço. Por isso a linha
+ * da Meta chega aqui marcada `transitoria:` pela própria rota
+ * (`lib/channels/meta/processar-webhook.ts`) sempre que uma ingestão devolveu
+ * `failed` — e este cron é a única nova tentativa que ela tem. O corpo inteiro
+ * passa de novo por `processarWebhookMeta`, que tolera reentrega em todo ramo.
+ *
  * A ordem e o corte usam `received_at`: `webhook_events_log` não tem
  * `created_at` (`supabase/baseline.sql`, `create table public.webhook_events_log`).
  */
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
+import { CHANNEL_PROVIDER_META } from "@/lib/channels/capabilities";
+import { lerEnvelopeMeta } from "@/lib/channels/meta/envelope";
+import { desfechoDoArquivoMeta, processarWebhookMeta } from "@/lib/channels/meta/processar-webhook";
+import { metaSessaoDoArquivo } from "@/lib/channels/meta/session";
 import { avisoDeEventoMorto, MENSAGEM_QUE_NAO_ENTROU } from "@/lib/event-log/aviso-de-evento-morto";
 import { logger } from "@/lib/logger";
 import type { createAdminClient } from "@/lib/supabase/admin";
-import { processarEventoWaha } from "@/lib/waha/desfecho-do-webhook";
+import { processarEventoWaha, type DesfechoDoEvento } from "@/lib/waha/desfecho-do-webhook";
 import { conferirContratoWaha, type WahaRoteamento } from "@/lib/waha/envelope";
 import { PREFIXO_TRANSITORIA } from "@/lib/waha/falha-transitoria";
 
@@ -39,6 +54,8 @@ export const ESPERA_MS = 2 * 60 * 1000;
 /** Com o cron a cada minuto, ~20 min de banco fora antes de desistir. */
 export const MAX_TENTATIVAS = 20;
 const LOTE = 50;
+/** Os valores de `webhook_events_log.provider` que este cron sabe reprocessar. */
+export const PROVEDORES_COM_REPLAY = ["waha", CHANNEL_PROVIDER_META] as const;
 const FALHAS_SEGUIDAS_PARA_PARAR = 3;
 
 type Admin = ReturnType<typeof createAdminClient>;
@@ -46,6 +63,8 @@ type Admin = ReturnType<typeof createAdminClient>;
 interface LinhaArquivada {
   id: string;
   organization_id: string;
+  /** Ausente em linha antiga de teste/dublê: vale como canal por QR. */
+  provider?: string | null;
   channel_session_id: string | null;
   payload_parsed: unknown;
   attempts: number;
@@ -83,7 +102,7 @@ async function avisarMensagemPerdida(admin: Admin, linha: LinhaArquivada, tentat
       .maybeSingle();
     if (jaAberto) return;
     const { title, body } = avisoDeEventoMorto({
-      eventType: "waha.webhook",
+      eventType: `${linha.provider ?? "waha"}.webhook`,
       tentativas,
       motivo: linha.error_message ?? "falha transitória do banco",
       efeito: MENSAGEM_QUE_NAO_ENTROU,
@@ -119,8 +138,8 @@ export async function reprocessarArquivoDeWebhooks(
   const corte = new Date(now.getTime() - ESPERA_MS).toISOString();
   const { data, error } = await admin
     .from("webhook_events_log")
-    .select("id, organization_id, channel_session_id, payload_parsed, attempts, error_message")
-    .eq("provider", "waha")
+    .select("id, organization_id, channel_session_id, provider, payload_parsed, attempts, error_message")
+    .in("provider", [...PROVEDORES_COM_REPLAY])
     .eq("status", "error")
     .like("error_message", `${PREFIXO_TRANSITORIA}%`)
     .lt("received_at", corte)
@@ -135,10 +154,11 @@ export async function reprocessarArquivoDeWebhooks(
   for (const linha of linhas) {
     if (falhasSeguidas >= FALHAS_SEGUIDAS_PARA_PARAR) break;
 
-    const contrato = linha.payload_parsed
-      ? conferirContratoWaha(linha.payload_parsed as WahaRoteamento)
-      : null;
-    if (!contrato || !contrato.ok) {
+    const tentativa =
+      linha.provider === CHANNEL_PROVIDER_META
+        ? await tentarLinhaMeta(admin, linha, requestId)
+        : await tentarLinhaWaha(admin, linha, requestId);
+    if (tentativa === "sem_corpo") {
       // Sem corpo (a retenção já o limpou) ou fora do contrato: tentar de novo
       // não muda nada. Morre, com aviso — a mensagem, se era uma, se perdeu.
       await marcarMorta(admin, linha, "replay: arquivo sem corpo legível", linha.attempts);
@@ -146,33 +166,20 @@ export async function reprocessarArquivoDeWebhooks(
       r.desistidas += 1;
       continue;
     }
-
-    const base = () =>
-      admin
-        .from("channel_sessions")
-        .select(
-          "id, organization_id, waha_session_name, webhook_secret_encrypted, status, is_warmup_complete, warmup_started_at",
-        )
-        .eq("id", linha.channel_session_id ?? "")
-        .eq("organization_id", linha.organization_id);
-    const { data: session, error: sessErr } = await queryTolerantToMissingArchived(
-      () => base().is(ARCHIVED_AT, null).maybeSingle(),
-      () => base().maybeSingle(),
-    );
-    if (sessErr) {
+    if (tentativa === "leitura_falhou") {
       // A própria leitura falhou: o banco ainda não voltou. Conta e segue a regra de parada.
       falhasSeguidas += 1;
       r.ainda_falhando += 1;
       continue;
     }
-    if (!session) {
+    if (tentativa === "sem_canal") {
       // Canal apagado ou arquivado: a rota também não ingeriria. Sem aviso — foi decisão de alguém.
       await marcarMorta(admin, linha, "replay: canal inexistente ou arquivado", linha.attempts);
       r.desistidas += 1;
       continue;
     }
 
-    const desfecho = await processarEventoWaha(admin, session, contrato.envelope, requestId, linha.id);
+    const desfecho = tentativa;
     if (desfecho === "tentar_de_novo") {
       falhasSeguidas += 1;
       const tentativas = linha.attempts + 1;
@@ -191,4 +198,87 @@ export async function reprocessarArquivoDeWebhooks(
     else r.desistidas += 1;
   }
   return r;
+}
+
+type Tentativa = DesfechoDoEvento | "sem_corpo" | "sem_canal" | "leitura_falhou";
+
+/** Canal por QR: o envelope WAHA, a sessão da linha e `processarEventoWaha`. */
+async function tentarLinhaWaha(admin: Admin, linha: LinhaArquivada, requestId: string): Promise<Tentativa> {
+  const contrato = linha.payload_parsed
+    ? conferirContratoWaha(linha.payload_parsed as WahaRoteamento)
+    : null;
+  if (!contrato || !contrato.ok) return "sem_corpo";
+
+  const base = () =>
+    admin
+      .from("channel_sessions")
+      .select(
+        "id, organization_id, waha_session_name, webhook_secret_encrypted, status, is_warmup_complete, warmup_started_at",
+      )
+      .eq("id", linha.channel_session_id ?? "")
+      .eq("organization_id", linha.organization_id);
+  const { data: session, error: sessErr } = await queryTolerantToMissingArchived(
+    () => base().is(ARCHIVED_AT, null).maybeSingle(),
+    () => base().maybeSingle(),
+  );
+  if (sessErr) return "leitura_falhou";
+  if (!session) return "sem_canal";
+
+  return processarEventoWaha(admin, session, contrato.envelope, requestId, linha.id);
+}
+
+/**
+ * Canal oficial da Meta: o corpo arquivado passa pelo mesmo contrato e pelo
+ * mesmo processamento da rota, na sessão e na organização DA LINHA — que a
+ * rota gravou a partir do token do path, nunca do corpo.
+ *
+ * Desfecho: `processed` quando nada ficou pendente; `tentar_de_novo` (a linha
+ * continua `transitoria:` e soma tentativa) quando alguma ingestão ainda
+ * falhou; `desistiu` quando o que sobrou foi recusa que tentar não conserta.
+ */
+async function tentarLinhaMeta(admin: Admin, linha: LinhaArquivada, requestId: string): Promise<Tentativa> {
+  if (!linha.payload_parsed || !linha.channel_session_id) return "sem_corpo";
+  const leitura = lerEnvelopeMeta(JSON.stringify(linha.payload_parsed));
+  if (!leitura.ok) return "sem_corpo";
+
+  let session: Awaited<ReturnType<typeof metaSessaoDoArquivo>>;
+  try {
+    session = await metaSessaoDoArquivo(admin as never, {
+      channelSessionId: linha.channel_session_id,
+      organizationId: linha.organization_id,
+    });
+  } catch {
+    return "leitura_falhou";
+  }
+  if (!session) return "sem_canal";
+
+  let desfecho: ReturnType<typeof desfechoDoArquivoMeta>;
+  try {
+    desfecho = desfechoDoArquivoMeta(
+      await processarWebhookMeta(admin as never, session, leitura.envelope, requestId),
+    );
+  } catch (err) {
+    logger.warn("[webhook-replay] reprocessamento da Meta lançou — tenta de novo", {
+      log_id: linha.id,
+      detail: err instanceof Error ? err.message.slice(0, 160) : String(err),
+    });
+    return "tentar_de_novo";
+  }
+
+  if (desfecho.status === "processed") {
+    const { error } = await admin
+      .from("webhook_events_log")
+      .update({ status: "processed", error_message: null, processed_at: new Date().toISOString() })
+      .eq("id", linha.id);
+    if (error) {
+      logger.warn("[webhook-replay] desfecho da Meta não gravado", { log_id: linha.id, detail: error.message });
+    }
+    return "processado";
+  }
+  if (desfecho.erro?.startsWith(PREFIXO_TRANSITORIA)) return "tentar_de_novo";
+  await admin
+    .from("webhook_events_log")
+    .update({ status: "error", error_message: desfecho.erro })
+    .eq("id", linha.id);
+  return "desistiu";
 }
