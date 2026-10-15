@@ -9,13 +9,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TeamMembersClient } from "./_components/TeamMembersClient";
 import { TeamInvitesClient } from "./_components/TeamInvitesClient";
 import { AttendantsClient } from "./_components/AttendantsClient";
+import { SetoresClient } from "./_components/SetoresClient";
 import { fusoUtilizavel } from "@/lib/tempo/fusos";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Equipe" };
 
 /**
- * As duas abas são endereçáveis, e isso não é conveniência.
+ * As abas são endereçáveis, e isso não é conveniência.
  *
  * O editor de jornada — "meus horários de atendimento" — mora na aba
  * "Atendimento", atrás de um botão só de ícone. Quem abre a Agenda numa
@@ -26,7 +27,13 @@ export const metadata: Metadata = { title: "Equipe" };
  * `aba` em português porque é o que aparece na barra de endereço de quem usa o
  * produto; os valores internos das abas seguem os do componente.
  */
-const ABAS: Record<string, string> = { membros: "members", atendimento: "attendants" };
+const ABAS: Record<string, string> = {
+  membros: "members",
+  atendimento: "attendants",
+  // Setores do atendimento (migration 0675): o editor do roteador de IA aponta
+  // para cá quando ainda não há setor para escolher.
+  setores: "setores",
+};
 
 export default async function TeamPage({
   searchParams,
@@ -66,6 +73,7 @@ export default async function TeamPage({
         <TabsList>
           <TabsTrigger value="members">{t("Membros")}</TabsTrigger>
           <TabsTrigger value="attendants">{t("Atendimento")}</TabsTrigger>
+          <TabsTrigger value="setores">{t("Setores")}</TabsTrigger>
         </TabsList>
         <TabsContent value="members" className="mt-4 flex flex-col gap-8">
           <TeamMembersClient currentUserId={user.id} canManage={isAdmin} />
@@ -99,6 +107,10 @@ export default async function TeamPage({
               )}
             </p>
           )}
+        </TabsContent>
+        <TabsContent value="setores" className="mt-4">
+          {/* Todos leem; só manager+ cria, edita e exclui (a API cobra o mesmo). */}
+          <SetoresClient canManage={isManager} />
         </TabsContent>
       </Tabs>
     </div>

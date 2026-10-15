@@ -893,7 +893,9 @@ export const NAV_CATALOG = [
   {
     href: "/app/team",
     label: "Equipe",
-    description: "Quem trabalha aqui, com qual papel e quanta conversa cada um aguenta.",
+    // A aba "Setores" (migration 0675) mora aqui, em `/app/team?aba=setores`:
+    // setor é agrupamento de gente, e a gente já é configurada nesta tela.
+    description: "Quem trabalha aqui, com qual papel, em que setor e quanta conversa cada um aguenta.",
     icon: "UsersThree",
     group: "organizacao",
     section: "Sua empresa",
