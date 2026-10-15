@@ -18,6 +18,11 @@ const { authMock, flowsMock, testeMock, updateMock, pipelinesMock, stagesMock, r
   // #2415 — o que o React Query devolve no refetch: undefined = sem query em cache.
   routerDataMock: vi.fn((): { data: unknown } => ({ data: undefined })),
 }));
+// 0675 — o seletor de setor lê os setores da organização.
+const { setoresMock } = vi.hoisted(() => ({
+  setoresMock: vi.fn((): { data: unknown } => ({ data: undefined })),
+}));
+vi.mock("@/hooks/team/useSetores", () => ({ useSetores: () => setoresMock() }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("@/hooks/auth/AuthProvider", () => ({ useAuth: authMock, usePermission: () => true }));
@@ -350,5 +355,64 @@ describe("destino do funil/etapa do roteador (#2415)", () => {
     expect(screen.getByRole("combobox", { name: "Funil de destino (opcional)" })).toHaveTextContent(
       "Sem destino — só escolher o agente",
     );
+  });
+});
+
+describe("setor da intenção (0675)", () => {
+  const ROTEADOR = {
+    id: "r1",
+    name: "Roteador",
+    channel_session_id: "s1",
+    is_active: true,
+    config: {},
+    fallback_agent_id: null,
+  };
+  const membro = (extra: Record<string, unknown>) =>
+    ({
+      id: "m1",
+      agent_id: "a1",
+      intent_name: "tributario",
+      intent_description: "dúvida de imposto",
+      examples: [],
+      position: 0,
+      flow_pointer_id: null,
+      ...extra,
+    }) as never;
+  function preparar() {
+    routerDataMock.mockReturnValue({ data: undefined });
+    authMock.mockReturnValue({ activeOrg: { modulos_ligados: [] } });
+    flowsMock.mockReturnValue({ data: undefined });
+    pipelinesMock.mockReturnValue({ data: undefined });
+  }
+  const elemento = (m: never) => (
+    <RouterEditorClient
+      routerId="r1"
+      initialState={{ router: ROTEADOR, members: [m] }}
+      agents={[{ id: "a1", name: "Agente" }]}
+      channelSessions={[]}
+      classifierModels={[]}
+    />
+  );
+
+  it("mostra o setor gravado na intenção", () => {
+    preparar();
+    setoresMock.mockReturnValue({ data: { data: [{ id: "s-trib", nome: "Tributário", membros: [] }] } });
+    render(elemento(membro({ setor_id: "s-trib" })));
+    expect(screen.getByRole("combobox", { name: "Setor (opcional)" })).toHaveTextContent("Tributário");
+  });
+
+  it("intenção sem setor (ou SSR legado sem o campo) mostra 'Sem setor'", () => {
+    preparar();
+    setoresMock.mockReturnValue({ data: { data: [{ id: "s-trib", nome: "Tributário", membros: [] }] } });
+    render(elemento(membro({})));
+    expect(screen.getByRole("combobox", { name: "Setor (opcional)" })).toHaveTextContent("Sem setor — qualquer atendente");
+  });
+
+  it("sem setor criado: aponta para a aba Setores de Equipe", () => {
+    preparar();
+    setoresMock.mockReturnValue({ data: { data: [] } });
+    render(elemento(membro({})));
+    const link = within(screen.getByTestId("seletor-de-setor")).getByRole("link", { name: "Criar setores em Equipe" });
+    expect(link).toHaveAttribute("href", "/app/team?aba=setores");
   });
 });
