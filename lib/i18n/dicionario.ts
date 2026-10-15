@@ -11932,6 +11932,15 @@ export const DICIONARIO: Traducoes = {
   "Banco de dados conectado": { es: "Base de datos conectada" },
   "Base de conhecimento": { es: "Base de conocimiento" },
   "Buscar dados no banco conectado": { es: "Buscar datos en la base conectada" },
+  "Conferir o CPF do cliente antes de mostrar dados": {
+    es: "Verificar el CPF del cliente antes de mostrar datos",
+  },
+  "Pede ao cliente os três últimos dígitos do CPF e confere no banco conectado antes de mostrar qualquer dado dele. Três erros bloqueiam por um dia e chamam a equipe.": {
+    es: "Pide al cliente los tres últimos dígitos del CPF y los verifica en la base conectada antes de mostrar cualquier dato suyo. Tres errores bloquean por un día y avisan al equipo.",
+  },
+  "Conferência de identidade do cliente": {
+    es: "Verificación de identidad del cliente",
+  },
   "Cadastro de clientes": { es: "Registro de clientes" },
   "Cancelar um retorno agendado": { es: "Cancelar un seguimiento programado" },
   "Catálogo da loja": { es: "Catálogo de la tienda" },
@@ -13712,6 +13721,18 @@ export const DICIONARIO: Traducoes = {
   "Informe o nome da coluna.": { es: "Indica el nombre de la columna." },
   "Cliente nas conversas": { es: "Cliente en las conversaciones" },
   "O que identifica o cliente": { es: "Qué identifica al cliente" },
+  "Exigir conferência de CPF antes de mostrar dados": {
+    es: "Exigir verificación de CPF antes de mostrar datos",
+  },
+  "Na conversa, o assistente pede os 3 últimos dígitos do CPF e confere no banco antes de mostrar qualquer dado. Três erros bloqueiam a consulta por 24 horas e chamam a equipe. Precisa do telefone como identificador e da função de conferência no banco.": {
+    es: "En la conversación, el asistente pide los 3 últimos dígitos del CPF y los verifica en la base antes de mostrar cualquier dato. Tres errores bloquean la consulta por 24 horas y avisan al equipo. Requiere el teléfono como identificador y la función de verificación en la base.",
+  },
+  "Para exigir a conferência de CPF, escolha o telefone como o que identifica o cliente e informe a coluna.": {
+    es: "Para exigir la verificación de CPF, elija el teléfono como lo que identifica al cliente e informe la columna.",
+  },
+  "Confere CPF": {
+    es: "Verifica CPF",
+  },
   "Na conversa com um cliente, o assistente só lê as linhas em que esta coluna é igual ao telefone ou ao e-mail de quem está falando. Sem isso, ele consulta este banco nas conversas sem limitar ao cliente.": { es: "En la conversación con un cliente, el asistente solo lee las filas en que esta columna es igual al teléfono o al correo de quien está hablando. Sin esto, consulta esta base de datos en las conversaciones sin limitarse al cliente." },
   "O telefone precisa estar gravado só com números, com ou sem o código do país ou o sinal + (5511999998888, 11999998888 ou +5511999998888).": { es: "El teléfono debe estar guardado solo con números, con o sin el código de país o el signo + (5511999998888, 11999998888 o +5511999998888)." },
   "Nas conversas, o assistente consulta este banco sem limitar ao cliente que está falando. Escolha, em Editar, a coluna que identifica o cliente.": { es: "En las conversaciones, el asistente consulta esta base de datos sin limitarse al cliente que está hablando. Elige, en Editar, la columna que identifica al cliente." },

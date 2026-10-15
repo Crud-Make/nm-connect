@@ -60,7 +60,7 @@ function ctx(contatoDoTurno: string | null = "contato-1"): McpContext {
   } as unknown as McpContext;
 }
 
-/** O estado guardado no NM Connect, em memória — o que `gravar` escreve, `ler` devolve. */
+/** O estado guardado no CRM, em memória — o que `gravar` escreve, `ler` devolve. */
 let guardado: EstadoDaConferencia | null = null;
 
 beforeEach(() => {

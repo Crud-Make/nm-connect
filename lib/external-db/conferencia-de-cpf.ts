@@ -23,7 +23,7 @@
  * `crm_leitor` só tem EXECUTE nela. Outro banco que queira a trava implementa a
  * mesma assinatura.
  *
- * ─── O estado mora no NM Connect ────────────────────────────────────────────
+ * ─── O estado mora no CRM ───────────────────────────────────────────────────
  *
  * `public.verificacoes_de_identidade`, uma linha por (organização, contato,
  * conexão). O banco externo é só leitura (`BEGIN READ ONLY` em `consultar`), e
@@ -130,7 +130,7 @@ export async function conferirCpfNoBancoExterno(
 }
 
 // ---------------------------------------------------------------------------
-// Leitura e escrita no NM Connect (service role — `organization_id` em TODA query)
+// Leitura e escrita no CRM (service role — `organization_id` em TODA query)
 // ---------------------------------------------------------------------------
 
 interface LinhaDaConferencia {
