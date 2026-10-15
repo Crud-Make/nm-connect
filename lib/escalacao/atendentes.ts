@@ -16,7 +16,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { estaPresente } from "@/lib/atendimento/presenca";
 import { ROLE_RANK, type Role } from "@/lib/auth/types";
-import { isAttendantEligible, OPEN_LOAD_STATUSES } from "@/lib/routing/eligibility";
+import { carregarCargaERodizio } from "@/lib/routing/carga";
+import { isAttendantEligible } from "@/lib/routing/eligibility";
 import { availabilityScheduleSchema } from "@/lib/schemas/routing";
 
 const COLUNAS_DISPONIBILIDADE =
@@ -92,22 +93,9 @@ export async function carregarRosterDeAtendimento(
     ((availData ?? []) as LinhaDisponibilidade[]).map((a) => [a.user_id, a] as const),
   );
 
-  const { data: openConvs, error: loadErr } = await admin
-    .from("conversations")
-    .select("assigned_to_user_id")
-    .eq("organization_id", organizationId)
-    .in("assigned_to_user_id", userIds)
-    .in("status", OPEN_LOAD_STATUSES as unknown as string[]);
-  if (loadErr) throw new Error(loadErr.message);
-  const cargaPorUsuario = new Map<string, number>();
-  for (const c of (openConvs ?? []) as Array<{ assigned_to_user_id: string | null }>) {
-    if (c.assigned_to_user_id) {
-      cargaPorUsuario.set(
-        c.assigned_to_user_id,
-        (cargaPorUsuario.get(c.assigned_to_user_id) ?? 0) + 1,
-      );
-    }
-  }
+  // Contada no banco: ler as linhas esbarrava no corte de 1000 do PostgREST
+  // (lib/routing/carga.ts). O roster não usa o rodízio, então sem canal.
+  const cargas = await carregarCargaERodizio(admin, organizationId, userIds, null);
 
   return atendentes.map((m) => {
     const a = porUsuario.get(m.user_id);
@@ -118,7 +106,7 @@ export async function carregarRosterDeAtendimento(
       capacidade: a?.capacity ?? null,
       agenda: a?.schedule ?? { timezone: "America/Sao_Paulo", windows: [] },
       atualizadoEm: a?.updated_at ?? null,
-      cargaAtual: cargaPorUsuario.get(m.user_id) ?? 0,
+      cargaAtual: cargas.get(m.user_id)?.carga ?? 0,
       // Quem nunca emitiu sinal tem `last_heartbeat_at` null, e o roster diz
       // `presente: false` — "não sei quando foi a última vez", que a tela mostra
       // diferente de "o sinal venceu". As duas coisas são ausência de presença.

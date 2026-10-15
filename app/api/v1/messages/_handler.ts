@@ -42,6 +42,8 @@ import {
 } from "@/lib/channels";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "@/lib/channels/archived";
 import { canalDesativado } from "@/lib/channels/desativado";
+import { ErroDeEnvioDoCanal, METADATA_ENTREGA_INCERTA } from "@/lib/channels/erro-de-envio";
+import { registrarCredencialRecusadaNoEnvio } from "@/lib/channels/credencial-recusada-no-envio";
 import { conferirDefinicao } from "@/lib/channels/conferir-definicao";
 import { estadoDaJanela } from "@/lib/channels/janela";
 import { isMediaPathOwnedBy } from "@/lib/messaging/media/upload-validation";
@@ -1263,9 +1265,15 @@ export async function sendMessageHandler(
       const msg = err instanceof Error ? err.message : adapter.codes.unknownError;
       // `storage_sign_failed` fica literal: é falha do NOSSO Storage, não do
       // canal — a URL assinada é montada antes de qualquer coisa tocar o adapter.
+      //
+      // Falha JÁ CLASSIFICADA pelo canal (`ErroDeEnvioDoCanal`) grava o código
+      // dela — `*_timeout`, `*_token_invalido`… — em vez do genérico: é o que
+      // diz ao operador o que fazer. Quem classifica é o canal; aqui só se
+      // escreve o que ele disse, sem perguntar QUAL canal é.
+      const classificada = err instanceof ErroDeEnvioDoCanal ? err : null;
       const code = msg.startsWith("storage_sign_failed")
         ? "storage_sign_failed"
-        : adapter.codes.sendFailed;
+        : (classificada?.codigo ?? adapter.codes.sendFailed);
 
       // Falta de CREDENCIAL não é falha desta mensagem: é canal ainda não
       // conectado, e o desfecho certo é `queued` — a mesma coisa que o ramo de
@@ -1297,10 +1305,32 @@ export async function sendMessageHandler(
           status: "failed",
           error_code: code,
           error_message: msg,
+          // Desfecho DESCONHECIDO (o transporte não respondeu a tempo): a marca
+          // é o que impede o ledger do agente de abrir uma tentativa nova sobre
+          // uma mensagem que pode ter chegado ao cliente. `failed` e não
+          // `queued`, porque `queued` é pedido de reenvio.
+          ...(classificada?.natureza === "incerta"
+            ? { metadata: { ...(message.metadata ?? {}), [METADATA_ENTREGA_INCERTA]: true } }
+            : {}),
         })
         .eq("id", message.id)
         .select(MSG_COLS)
         .maybeSingle();
+      // Token recusado é a CONEXÃO parada, não esta mensagem: marca a sessão e
+      // abre o aviso pelo mecanismo do vigia de saúde. Melhor esforço — uma
+      // falha aqui não pode impedir a linha de terminar `failed`.
+      if (classificada?.natureza === "credencial" && c.channel_session_id) {
+        await registrarCredencialRecusadaNoEnvio({
+          organizationId: ctx.organization_id,
+          channelSessionId: c.channel_session_id,
+        }).catch((erro: unknown) => {
+          logger.warn("messages.send.credencial_recusada_nao_registrada", {
+            requestId: ctx.requestId,
+            channelSessionId: c.channel_session_id,
+            detail: erro instanceof Error ? erro.message.slice(0, 200) : "erro",
+          });
+        });
+      }
       if (updated) {
         message = updated as unknown as Message;
         // A linha passou a `failed` — é AGORA que o integrador tem de saber

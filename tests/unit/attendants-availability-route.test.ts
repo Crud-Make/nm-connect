@@ -60,13 +60,26 @@ function fazerAdmin(porTabela: Record<string, unknown[]>) {
       eq: () => chain,
       is: () => chain,
       in: () => chain,
+      // Leitura de linhas passa pelo corte silencioso do PostgREST (max_rows=1000).
       then: (res: (v: unknown) => unknown) =>
-        Promise.resolve({ data: porTabela[tabela] ?? [], error: null }).then(res),
+        Promise.resolve({ data: (porTabela[tabela] ?? []).slice(0, 1000), error: null }).then(res),
     };
     return chain;
   };
+  // A contagem no banco vê todas as linhas (é um count no Postgres, não linhas no fio).
+  const rpc = (nome: string, args: { p_user_ids: string[] }) => {
+    if (nome !== "fn_carga_e_rodizio_dos_atendentes") throw new Error(`rpc inesperada: ${nome}`);
+    const conversas = (porTabela.conversations ?? []) as Array<{ assigned_to_user_id: string }>;
+    const data = args.p_user_ids.map((user_id) => ({
+      user_id,
+      carga: conversas.filter((c) => c.assigned_to_user_id === user_id).length,
+      ultima_atribuicao_em: null,
+    }));
+    return Promise.resolve({ data, error: null });
+  };
   return {
     from,
+    rpc,
     auth: {
       admin: {
         getUserById: (id: string) =>
@@ -212,6 +225,26 @@ describe("GET /api/v1/attendants/availability", () => {
     // Quem nunca configurou disponibilidade vem com capacidade null — é "não
     // configurado", não "capacidade zero", e a tela mostra os dois diferente.
     expect(body.data.find((r) => r.user_id === CARLA)?.capacity).toBeNull();
+  });
+
+  it("carga acima de 1000 conversas abertas não é cortada pelo max_rows", async () => {
+    sessao("agent");
+    vi.mocked(createAdminClient).mockReturnValue(
+      fazerAdmin({
+        ...EQUIPE,
+        // 1100 da Ana chegam antes; as 30 do Bruno ficariam além do corte.
+        conversations: [
+          ...Array.from({ length: 1100 }, () => ({ assigned_to_user_id: ANA })),
+          ...Array.from({ length: 30 }, () => ({ assigned_to_user_id: BRUNO })),
+        ],
+      }) as unknown as ReturnType<typeof createAdminClient>,
+    );
+
+    const body = (await (await chamar()).json()) as {
+      data: Array<{ user_id: string; current_load: number }>;
+    };
+    expect(body.data.find((r) => r.user_id === ANA)?.current_load).toBe(1100);
+    expect(body.data.find((r) => r.user_id === BRUNO)?.current_load).toBe(30);
   });
 
   it("viewer é barrado antes de qualquer consulta", async () => {

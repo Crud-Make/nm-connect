@@ -21,6 +21,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { linhaDoEspelho } from "../linha-do-espelho";
 
 import { resolveMetaCreds } from "./credentials";
+import { erroDaRespostaDaGraph, erroDeTempoEsgotado } from "./erros-da-graph";
 import { sendTemplate } from "./send-template";
 
 export interface SendTemplateForSessionInput {
@@ -167,7 +168,13 @@ export async function sendTemplateForSession(
       throw new Error(`template_stale: ${input.name} mudou na Meta desde a configuração`);
     case "missing_values":
       throw new Error(`template_missing_values: ${resultado.missing.join(", ")}`);
+    case "timeout":
+      // Desfecho DESCONHECIDO: natureza `incerta`, que o handler grava como
+      // `failed` marcado e que ninguém reenvia sozinho.
+      throw erroDeTempoEsgotado(prefixo);
     case "api_error":
-      throw new Error(`${prefixo}_${resultado.code ?? "erro"}: ${resultado.message}`);
+      // Mesmo formato de mensagem de antes; o que muda é o `error_code`
+      // classificado (190 → token, 130429 → limite…), lido do mapa único.
+      throw erroDaRespostaDaGraph({ code: resultado.code, detalhe: resultado.message }, prefixo);
   }
 }

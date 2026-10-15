@@ -100,6 +100,9 @@ function makeSupabaseStub(state: StubState) {
   return {
     from,
     rpc: (fn: string, args: Record<string, unknown>) => {
+      // A carga/rodízio contados no banco (lib/routing/carga.ts): ninguém com
+      // carga nem atribuição anterior. Fica fora de `rpcCalls`, que registra os efeitos.
+      if (fn === "fn_carga_e_rodizio_dos_atendentes") return Promise.resolve({ data: [], error: null });
       state.rpcCalls.push({ fn, args });
       return Promise.resolve({ data: fn === "fn_channel_routing_claim" ? state.claimResult ?? "assigned" : null, error: null });
     },

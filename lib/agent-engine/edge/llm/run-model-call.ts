@@ -56,7 +56,7 @@ import {
   SQL_ORCAMENTO,
   type ChaveDeOrcamento,
 } from './orcamento';
-import { costCents } from './pricing';
+import { custoDaChamada } from './custo-da-chamada';
 import { chaveDeOrcamentoDaInstalacao } from '../../../instalacao/comportamento';
 import { cobrancaLigadaComMemo } from '../../../instalacao/modulos';
 import { createDefaultRegistry, type ProviderRegistry } from './providers';
@@ -262,6 +262,19 @@ export interface RunModelCallInput {
   maxOutputTokens?: number;
   /** Cancelamento propagado pelo chamador; a falha continua registrada em llm_calls. */
   abortSignal?: AbortSignal;
+  /**
+   * Teto de cada ETAPA do loop (`timeout.stepMs` do AI SDK): a ida ao modelo,
+   * com as re-tentativas do SDK, mais as tools daquela etapa. Estourado, a
+   * etapa é abortada (o sinal chega ao `fetch` do provider) e a chamada FALHA
+   * pelo caminho de sempre — linha em `llm_calls` e erro relançado.
+   *
+   * Por etapa, e não pelo loop inteiro: um turno saudável de várias etapas
+   * (tools, pausas humanas antes do envio) pode somar mais que uma etapa
+   * pendurada, e um teto total o mataria junto. Sem ele, NADA limita a espera:
+   * nem o `fetch` contido do provider nem o SDK têm prazo próprio, e o turno
+   * ficava preso até o `QUEUE_VISIBILITY_TIMEOUT_MS` (600 s) da fila.
+   */
+  tetoPorEtapaMs?: number;
   /**
    * Override de provider/credencial vindo da versão PUBLICADA do agente (Fase
    * 2B) — resolvido no seam, nunca no call site. Sem ele, config da org.
@@ -886,6 +899,7 @@ export async function runModelCall(db: pg.Pool, cfg: LlmEdgeConfig, input: RunMo
       system: prefix.system,
       messages: input.messages,
       abortSignal: input.abortSignal,
+      ...(input.tetoPorEtapaMs !== undefined ? { timeout: { stepMs: input.tetoPorEtapaMs } } : {}),
       tools: guardServiceTools(prefix.tools),
       stopWhen:
         input.maxSteps === undefined
@@ -952,6 +966,12 @@ export async function runModelCall(db: pg.Pool, cfg: LlmEdgeConfig, input: RunMo
 
     return generateText({
       ...opcoesBase,
+      // A OpenRouter põe o custo debitado em `usage.cost`, e o `@ai-sdk/openai`
+      // o descarta do `usage` normalizado: só o corpo cru o carrega. Sem isto o
+      // custo de todo modelo fora da tabela do motor saía nulo e o teto de gasto
+      // nunca disparava (`custo-da-chamada.ts`). Só nela: nos outros provedores o
+      // corpo não traz custo e reter a resposta inteira seria memória à toa.
+      ...(cfgUsada.provider === 'openrouter' ? { include: { responseBody: true } } : {}),
       temperature,
       topP,
       topK,
@@ -1125,7 +1145,14 @@ export async function runModelCall(db: pg.Pool, cfg: LlmEdgeConfig, input: RunMo
   // O TTL é o MESMO que gravou o prefixo estável acima: a gravação de cache custa
   // 1.25× a entrada em 5m e 2× em 1h, e supor a doutrina superfaturaria 60% da
   // parcela de cache write em quem usa o knob.
-  const cost = costCents(model, usage, cfg.cacheTtl ?? '1h');
+  // Ordem: o custo que o provedor informou > a tabela do motor > o catálogo
+  // (`ai_models`) > null. O porquê de cada degrau está em `custo-da-chamada.ts`.
+  const { cents: cost, fonte: fonteDoCusto } = await custoDaChamada(db, {
+    model,
+    usage,
+    cacheTtl: cfg.cacheTtl ?? '1h',
+    steps: result.steps,
+  });
 
   const { rows } = await db.query<{ id: string }>(
     `insert into llm_calls
@@ -1165,6 +1192,7 @@ export async function runModelCall(db: pg.Pool, cfg: LlmEdgeConfig, input: RunMo
     origem_da_escolha: origem,
     ...usage,
     cost_cents: cost,
+    fonte_do_custo: fonteDoCusto,
     latency_ms: latencyMs,
   });
   for (const aviso of decisao.avisos) {
