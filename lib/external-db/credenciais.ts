@@ -69,6 +69,7 @@ interface LinhaConexao {
   max_response_bytes: number | null;
   customer_key_column: string | null;
   customer_key_kind: TipoDeIdentificador | null;
+  require_cpf_check: boolean | null;
   updated_at: string;
 }
 
@@ -80,7 +81,7 @@ export async function carregarConexao(
   const { data, error } = await admin
     .from("external_db_connections")
     .select(
-      "id, organization_id, label, host, port, database_name, username, password_encrypted, password_iv, password_tag, ssl_mode, enabled, max_rows, max_filters, max_response_bytes, customer_key_column, customer_key_kind, updated_at",
+      "id, organization_id, label, host, port, database_name, username, password_encrypted, password_iv, password_tag, ssl_mode, enabled, max_rows, max_filters, max_response_bytes, customer_key_column, customer_key_kind, require_cpf_check, updated_at",
     )
     .eq("organization_id", organizationId)
     .eq("id", connectionId)
@@ -130,6 +131,9 @@ export async function carregarConexao(
         data.customer_key_column && data.customer_key_kind
           ? { coluna: data.customer_key_column, tipo: data.customer_key_kind }
           : null,
+      // `true` literal: valor nulo ou ausente nunca liga a trava sozinho. O CHECK
+      // do banco só aceita `true` com a chave do cliente por telefone.
+      exigeConferenciaDeCpf: data.require_cpf_check === true,
       versao: data.updated_at,
     },
   };

@@ -45,6 +45,14 @@ const camposDeConexao = {
    */
   customer_key_column: z.string().trim().min(1).max(128).nullable(),
   customer_key_kind: z.enum(TIPOS_DE_IDENTIFICADOR).nullable(),
+  /**
+   * A TRAVA DO CPF: na conversa, a consulta só sai depois de o cliente acertar
+   * os 3 últimos dígitos do CPF (`crm_confirm_customer_identity`). Exige a chave
+   * do cliente por TELEFONE — a conferência é feita com o telefone do contato do
+   * turno —, e o CHECK `external_db_connections_cpf_exige_telefone` diz o mesmo
+   * no banco (é ele que decide no PATCH que não toca na chave).
+   */
+  require_cpf_check: z.boolean(),
 };
 
 /** Coluna e tipo andam juntos: um sem o outro não identifica ninguém. */
@@ -60,6 +68,28 @@ function chaveDoClienteCompleta(v: {
 const CHAVE_INCOMPLETA = {
   path: ["customer_key_column"],
   message: "customer_key_column e customer_key_kind vêm juntos, ou nenhum dos dois",
+};
+
+/**
+ * Trava do CPF ligada pede a chave por telefone. Só julga o que veio no corpo:
+ * num PATCH que liga a trava sem mandar a chave, quem decide é o CHECK do banco,
+ * que enxerga a linha inteira.
+ */
+function travaDoCpfComTelefone(v: {
+  require_cpf_check?: boolean;
+  customer_key_kind?: string | null;
+}): boolean {
+  if (v.require_cpf_check !== true) return true;
+  if (v.customer_key_kind === undefined) return true;
+  return v.customer_key_kind === "phone";
+}
+
+export const MENSAGEM_TRAVA_SEM_TELEFONE =
+  "Para exigir a conferência de CPF, escolha o telefone como o que identifica o cliente e informe a coluna.";
+
+const TRAVA_SEM_TELEFONE = {
+  path: ["require_cpf_check"],
+  message: MENSAGEM_TRAVA_SEM_TELEFONE,
 };
 
 /** Criação: exige os campos essenciais; porta, TLS e `enabled` têm default. */
@@ -78,9 +108,12 @@ export const criarConexaoSchema = z
     max_response_bytes: camposDeConexao.max_response_bytes.default(LIMITE_RESPOSTA_BYTES.padrao),
     customer_key_column: camposDeConexao.customer_key_column.default(null),
     customer_key_kind: camposDeConexao.customer_key_kind.default(null),
+    require_cpf_check: camposDeConexao.require_cpf_check.default(false),
   })
   .strict()
-  .refine(chaveDoClienteCompleta, CHAVE_INCOMPLETA);
+  .refine(chaveDoClienteCompleta, CHAVE_INCOMPLETA)
+  // Na criação a chave sempre existe (default null), então ligar sem ela recusa aqui.
+  .refine((v) => !v.require_cpf_check || v.customer_key_kind === "phone", TRAVA_SEM_TELEFONE);
 
 /**
  * Atualização parcial. `password` é opcional: ausente = não mexer na senha
@@ -101,9 +134,11 @@ export const atualizarConexaoSchema = z
     max_response_bytes: camposDeConexao.max_response_bytes.optional(),
     customer_key_column: camposDeConexao.customer_key_column.optional(),
     customer_key_kind: camposDeConexao.customer_key_kind.optional(),
+    require_cpf_check: camposDeConexao.require_cpf_check.optional(),
   })
   .strict()
-  .refine(chaveDoClienteCompleta, CHAVE_INCOMPLETA);
+  .refine(chaveDoClienteCompleta, CHAVE_INCOMPLETA)
+  .refine(travaDoCpfComTelefone, TRAVA_SEM_TELEFONE);
 
 /**
  * Leitura paginada. Sem FILTRO de propósito: filtro carrega VALOR, valor carrega
