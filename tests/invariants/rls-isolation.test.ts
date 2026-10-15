@@ -504,6 +504,20 @@ beforeAll(() => {
                     '\\x00000000000000000000000000000000'::bytea);
         end if;
 
+        -- migration 0676 — a trava do CPF: o estado da conferência de um
+        -- contato numa conexão. Não guarda CPF nem telefone, mas vazar a linha
+        -- diria ao vizinho QUEM consulta processos no escritório e quem errou o
+        -- CPF. Leitura org-flat (o agent semeado é controle positivo); a
+        -- escrita é só do servidor.
+        if not exists (select 1 from public.verificacoes_de_identidade where organization_id = v_org) then
+          insert into public.verificacoes_de_identidade
+            (organization_id, contact_id, connection_id, verificado_ate)
+            select v_org, v_contact, c.id, now() + interval '1 day'
+              from public.external_db_connections c
+             where c.organization_id = v_org
+             limit 1;
+        end if;
+
         -- migrations 0374/0375 -- a campanha e quem ela alcancou. A tabela
         -- campaigns NAO entra na lista de TABLES porque nao tem FK para
         -- contacts; as duas que guardam pessoa, sim. channel_session_id e
@@ -712,6 +726,9 @@ export const TABLES = [
   // provar isso pediria um usuário abaixo de admin escrevendo. Fica declarado
   // em vez de parecer coberto.
   "external_db_connections",
+  // migration 0676 — a trava do CPF: quem conferiu, errou ou está bloqueado na
+  // consulta de processos. Leitura org-flat, escrita só do servidor.
+  "verificacoes_de_identidade",
   // ⚠️ `webhook_lead_captures` (migration 0174) NÃO entra nesta lista, e a
   // ausência é deliberada: a policy dela exige `manager`, e o usuário semeado
   // aqui é `agent` — o controle positivo falharia por ACERTO, e a "correção"

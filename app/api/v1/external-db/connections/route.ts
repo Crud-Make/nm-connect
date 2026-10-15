@@ -23,7 +23,7 @@ import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { cifrarSenha } from "@/lib/external-db/credenciais";
 import { validarHostDeBanco } from "@/lib/external-db/guardas";
-import { criarConexaoSchema } from "@/lib/external-db/schemas";
+import { criarConexaoSchema, MENSAGEM_TRAVA_SEM_TELEFONE } from "@/lib/external-db/schemas";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { checkRateLimit } from "@/lib/ai/dispatcher/rate-limit";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -34,7 +34,7 @@ import { seModuloDesligado } from "../_falha";
 export const dynamic = "force-dynamic";
 
 const COLUNAS_SEGURAS =
-  "id, organization_id, label, host, port, database_name, username, ssl_mode, enabled, max_rows, max_filters, max_response_bytes, customer_key_column, customer_key_kind, last_tested_at, last_test_ok, last_test_error, created_by, created_at, updated_at";
+  "id, organization_id, label, host, port, database_name, username, ssl_mode, enabled, max_rows, max_filters, max_response_bytes, customer_key_column, customer_key_kind, require_cpf_check, last_tested_at, last_test_ok, last_test_error, created_by, created_at, updated_at";
 
 export async function GET(): Promise<Response> {
   const requestId = randomUUID();
@@ -123,12 +123,20 @@ export async function POST(req: NextRequest): Promise<Response> {
       max_response_bytes: input.max_response_bytes,
       customer_key_column: input.customer_key_column,
       customer_key_kind: input.customer_key_kind,
+      require_cpf_check: input.require_cpf_check,
       created_by: authUser.id,
     })
     .select(COLUNAS_SEGURAS)
     .single();
 
   if (error || !created) {
+    if (error?.code === "23514") {
+      // O CHECK da trava do CPF (0676) — o Zod já recusa, isto é a rede.
+      return fail("validation_failed", t(MENSAGEM_TRAVA_SEM_TELEFONE), 422, {
+        requestId,
+        details: { fieldErrors: { require_cpf_check: [t(MENSAGEM_TRAVA_SEM_TELEFONE)] } },
+      });
+    }
     if (error?.code === "23505") {
       return fail(
         "external_db_label_em_uso",
@@ -147,7 +155,13 @@ export async function POST(req: NextRequest): Promise<Response> {
     resourceType: "external_db_connection",
     resourceId: created.id,
     requestId,
-    metadata: { label: input.label, host: input.host, port: input.port, ssl_mode: input.ssl_mode },
+    metadata: {
+      label: input.label,
+      host: input.host,
+      port: input.port,
+      ssl_mode: input.ssl_mode,
+      require_cpf_check: input.require_cpf_check,
+    },
   });
 
   return ok(created, { status: 201, requestId });

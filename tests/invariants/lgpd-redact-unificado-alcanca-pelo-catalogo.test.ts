@@ -329,6 +329,10 @@ const DECISOES: Record<string, Decisao> = {
     decidida: "manter",
     razao: "token/utm/query de aterrissagem da Meta, mesmo motivo do gclid: identificador de campanha que só serve enquanto existir — apagar desfaz a atribuição sem proteger texto de ninguém.",
   },
+  verificacoes_de_identidade: {
+    decidida: "manter",
+    razao: "Estado da conferência de CPF da trava do banco externo (migration 0676): só prazos (verificado_ate, bloqueado_ate) e uma contagem de erros — nenhum CPF, dígito ou telefone. Não há texto da pessoa a redigir; a FK existe para dizer DE QUEM é a conferência, e a linha some com o contato apagado.",
+  },
   send_ledger: {
     decidida: "manter",
     razao: "body_hash é IRREVERSÍVEL (a própria doutrina do invariante irmão manda `_hash` ficar de fora) e last_error/status são código; é a prova de que a mensagem saiu, sem guardar o que ela dizia.",

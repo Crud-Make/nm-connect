@@ -21,6 +21,8 @@ const { TOOL_CATALOG, deModuloDesligado } = await import("@/lib/mcp/tools/catalo
 
 const ORG = "11111111-1111-4111-8111-111111111111";
 const NOMES = ["crm_describe_external_data", "crm_query_external_data"] as const;
+/** A trava do CPF (#18): entra sozinha junto com a busca, e some com o módulo como as outras. */
+const CONFERENCIA = "crm_confirm_customer_identity";
 
 function montar(modulosLigados: Array<"banco_externo">) {
   const ator = { type: "ai_agent", id: "ag-1", role: "ai_operator" };
@@ -50,8 +52,8 @@ function montar(modulosLigados: Array<"banco_externo">) {
 }
 
 describe("banco_externo desligado: as ferramentas não chegam ao modelo", () => {
-  it("o catálogo declara o módulo nas duas entradas", () => {
-    for (const nome of NOMES) {
+  it("o catálogo declara o módulo nas três entradas", () => {
+    for (const nome of [...NOMES, CONFERENCIA]) {
       const entrada = TOOL_CATALOG.find((t) => t.name === nome);
       expect(entrada, nome).toBeDefined();
       expect(entrada?.modulo, nome).toBe("banco_externo");
@@ -69,7 +71,7 @@ describe("banco_externo desligado: as ferramentas não chegam ao modelo", () => 
     expect(Object.keys(montar([]))).toEqual([]);
   });
 
-  it("controle: com o módulo ligado as duas chegam", () => {
-    expect(Object.keys(montar(["banco_externo"])).sort()).toEqual([...NOMES].sort());
+  it("controle: com o módulo ligado as duas chegam, e a conferência de CPF vem junto com a busca", () => {
+    expect(Object.keys(montar(["banco_externo"])).sort()).toEqual([...NOMES, CONFERENCIA].sort());
   });
 });

@@ -21,7 +21,7 @@ import { requireRole } from "@/lib/auth/require-role";
 import { cifrarSenha } from "@/lib/external-db/credenciais";
 import { fecharPool } from "@/lib/external-db/conexao";
 import { validarHostDeBanco } from "@/lib/external-db/guardas";
-import { atualizarConexaoSchema } from "@/lib/external-db/schemas";
+import { atualizarConexaoSchema, MENSAGEM_TRAVA_SEM_TELEFONE } from "@/lib/external-db/schemas";
 import { checkRateLimit } from "@/lib/ai/dispatcher/rate-limit";
 import { traduzir } from "@/lib/i18n/dicionario";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -32,7 +32,7 @@ import { seModuloDesligado } from "../../_falha";
 export const dynamic = "force-dynamic";
 
 const COLUNAS_SEGURAS =
-  "id, organization_id, label, host, port, database_name, username, ssl_mode, enabled, max_rows, max_filters, max_response_bytes, customer_key_column, customer_key_kind, last_tested_at, last_test_ok, last_test_error, created_by, created_at, updated_at";
+  "id, organization_id, label, host, port, database_name, username, ssl_mode, enabled, max_rows, max_filters, max_response_bytes, customer_key_column, customer_key_kind, require_cpf_check, last_tested_at, last_test_ok, last_test_error, created_by, created_at, updated_at";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -131,6 +131,14 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
     .maybeSingle();
 
   if (error) {
+    if (error.code === "23514") {
+      // A trava do CPF ligada sem a chave do cliente por telefone: quem decide é
+      // o CHECK da 0676, que enxerga a linha inteira (o PATCH é parcial).
+      return fail("validation_failed", t(MENSAGEM_TRAVA_SEM_TELEFONE), 422, {
+        requestId,
+        details: { fieldErrors: { require_cpf_check: [t(MENSAGEM_TRAVA_SEM_TELEFONE)] } },
+      });
+    }
     if (error.code === "23505") {
       return fail("external_db_label_em_uso", t("Já existe uma conexão com este nome."), 409, {
         requestId,

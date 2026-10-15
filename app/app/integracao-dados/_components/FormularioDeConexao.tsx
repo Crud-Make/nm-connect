@@ -33,6 +33,7 @@ import {
 } from "@/hooks/external-db/useConexoesExternas";
 import { useT } from "@/hooks/i18n/useT";
 import { LIMITE_FILTROS, LIMITE_LINHAS, LIMITE_RESPOSTA_BYTES } from "@/lib/external-db/limites";
+import { MENSAGEM_TRAVA_SEM_TELEFONE } from "@/lib/external-db/schemas";
 
 const MODOS_TLS = [
   { valor: "require", rotulo: "Obrigatório (padrão)" },
@@ -117,6 +118,7 @@ export function FormularioDeConexao({ open, onOpenChange, conexao }: Props) {
     conexao?.customer_key_kind ?? "nenhum",
   );
   const [colunaDoCliente, setColunaDoCliente] = useState(conexao?.customer_key_column ?? "");
+  const [exigirCpf, setExigirCpf] = useState(conexao?.require_cpf_check ?? false);
   const [salvando, setSalvando] = useState(false);
   const [erros, setErros] = useState<Record<string, string | undefined>>({});
 
@@ -157,6 +159,12 @@ export function FormularioDeConexao({ open, onOpenChange, conexao }: Props) {
       setErros({ customer_key_column: t("Informe o nome da coluna.") });
       return;
     }
+    // A trava do CPF confere pelo telefone da conversa: sem a chave por telefone,
+    // a API recusaria (Zod e o CHECK da 0676). Barrar aqui explica antes.
+    if (exigirCpf && identificador !== "phone") {
+      setErros({ require_cpf_check: t(MENSAGEM_TRAVA_SEM_TELEFONE) });
+      return;
+    }
     const chaveDoCliente =
       identificador === "nenhum"
         ? { customer_key_column: null, customer_key_kind: null }
@@ -184,6 +192,7 @@ export function FormularioDeConexao({ open, onOpenChange, conexao }: Props) {
           max_filters: parsed.data.max_filters,
           max_response_bytes: parsed.data.max_response_kb * KB,
           ...chaveDoCliente,
+          require_cpf_check: exigirCpf,
           ...(parsed.data.password ? { password: parsed.data.password } : {}),
         });
         toast.success(t("Conexão atualizada."));
@@ -201,6 +210,7 @@ export function FormularioDeConexao({ open, onOpenChange, conexao }: Props) {
           max_filters: parsed.data.max_filters,
           max_response_bytes: parsed.data.max_response_kb * KB,
           ...chaveDoCliente,
+          require_cpf_check: exigirCpf,
         });
         toast.success(t("Conexão criada. Use Testar para conferir o acesso."));
       }
@@ -372,6 +382,33 @@ export function FormularioDeConexao({ open, onOpenChange, conexao }: Props) {
                 {t("O telefone precisa estar gravado só com números, com ou sem o código do país ou o sinal + (5511999998888, 11999998888 ou +5511999998888).")}
               </p>
             )}
+            <div className="flex items-start justify-between gap-3 border-t pt-3">
+              <div className="space-y-1">
+                <Label htmlFor="ext-require-cpf">{t("Exigir conferência de CPF antes de mostrar dados")}</Label>
+                <p className="text-xs text-muted-foreground">
+                  {t(
+                    "Na conversa, o assistente pede os 3 últimos dígitos do CPF e confere no banco antes de mostrar qualquer dado. Três erros bloqueiam a consulta por 24 horas e chamam a equipe. Precisa do telefone como identificador e da função de conferência no banco.",
+                  )}
+                </p>
+                {erros.require_cpf_check && (
+                  <p className="text-xs text-destructive" role="alert">
+                    {erros.require_cpf_check}
+                  </p>
+                )}
+              </div>
+              <Switch
+                id="ext-require-cpf"
+                checked={exigirCpf}
+                onCheckedChange={(ligado) => {
+                  setExigirCpf(ligado);
+                  setErros((atuais) => ({
+                    ...atuais,
+                    require_cpf_check:
+                      ligado && identificador !== "phone" ? t(MENSAGEM_TRAVA_SEM_TELEFONE) : undefined,
+                  }));
+                }}
+              />
+            </div>
           </fieldset>
 
           <fieldset className="space-y-3 rounded-md border p-3">
