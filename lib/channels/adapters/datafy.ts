@@ -27,6 +27,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 import { canalGraphParceiroLigado, graphPartnerGraphBase, resolveGraphPartnerCreds } from "../graph-parceiro/credentials";
 import { graphPartnerTemplateOps } from "../graph-parceiro/templates";
+import { postarMensagemNaGraph } from "../meta/erros-da-graph";
 import { sendTemplateForSession } from "../meta/send-template-for-session";
 import type {
   ChannelAdapter,
@@ -159,33 +160,18 @@ export const datafyAdapter: ChannelAdapter = {
       { type: "text", text: { body: envelope.body ?? "" } };
 
     await envelope.beforeSend?.();
-    const res = await fetch(
-      `${graphPartnerGraphBase()}/${encodeURIComponent(creds.phoneNumberId)}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${creds.token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          recipient_type: "individual",
-          to: envelope.to,
-          ...corpo,
-        }),
+    // Mesmo transporte, teto e leitura de erro do canal oficial — o dialeto é o
+    // mesmo, e duas cópias garantiriam que o primeiro conserto faltasse num lado.
+    return postarMensagemNaGraph({
+      url: `${graphPartnerGraphBase()}/${encodeURIComponent(creds.phoneNumberId)}/messages`,
+      token: creds.token,
+      corpo: {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: envelope.to,
+        ...corpo,
       },
-    );
-
-    const body = (await res.json().catch(() => ({}))) as {
-      messages?: { id?: string }[];
-      error?: { code?: number; message?: string; error_data?: { details?: string } };
-    };
-
-    if (!res.ok || body.error) {
-      const detalhe = body.error?.error_data?.details ?? body.error?.message ?? `http_${res.status}`;
-      throw new Error(`datafy_${body.error?.code ?? res.status}: ${detalhe}`);
-    }
-
-    return { externalId: body.messages?.[0]?.id ?? null };
+      prefixo: "datafy",
+    });
   },
 };

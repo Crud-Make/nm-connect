@@ -38,6 +38,20 @@ describe("verifyMetaSignature", () => {
     expect(verifyMetaSignature(body, "sha256=abcd", SECRET)).toBe(false);
   });
 
+  it("assinatura do tamanho CERTO mas não-hex devolve false, não estoura", () => {
+    // 64 caracteres passavam na comparação de tamanho das strings; o
+    // `Buffer.from(x, "hex")` para no primeiro não-hex e devolvia Buffer vazio,
+    // e o timingSafeEqual lançava ERR_CRYPTO_TIMING_SAFE_EQUAL_LENGTH → 500.
+    for (const lixo of ["z".repeat(64), `${"a".repeat(63)}g`, `${"ab".repeat(31)} x`]) {
+      expect(() => verifyMetaSignature(body, `sha256=${lixo}`, SECRET)).not.toThrow();
+      expect(verifyMetaSignature(body, `sha256=${lixo}`, SECRET)).toBe(false);
+    }
+  });
+
+  it("hex em MAIÚSCULAS continua aceito — é o mesmo valor", () => {
+    expect(verifyMetaSignature(body, sign(body).toUpperCase().replace("SHA256=", "sha256="), SECRET)).toBe(true);
+  });
+
   it("sem header e sem segredo = false (fail-closed)", () => {
     expect(verifyMetaSignature(body, null, SECRET)).toBe(false);
     expect(verifyMetaSignature(body, sign(body), "")).toBe(false);
@@ -188,6 +202,33 @@ describe("parseMetaWebhook", () => {
       status: "failed",
       errorCode: 131047,
     });
+  });
+
+  it("o `timestamp` do status (epoch em SEGUNDOS, string) vira `occurredAt`", () => {
+    const [comHora, semHora, torto] = parseMetaWebhook({
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "waba1",
+          changes: [
+            {
+              field: "messages",
+              value: {
+                statuses: [
+                  { id: "wamid.A", status: "read", timestamp: "1785342028" },
+                  { id: "wamid.B", status: "delivered" },
+                  { id: "wamid.C", status: "delivered", timestamp: "ontem" },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(comHora).toMatchObject({ occurredAt: new Date(1785342028 * 1000) });
+    // Ausente ou ilegível é null — nunca 1970 nem Invalid Date.
+    expect(semHora).toMatchObject({ occurredAt: null });
+    expect(torto).toMatchObject({ occurredAt: null });
   });
 
   it("campo desconhecido é IGNORADO, não erro — senão a Meta re-entrega em loop", () => {
