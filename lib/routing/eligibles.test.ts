@@ -232,3 +232,66 @@ describe("carga e rodízio sem o corte de 1000 linhas do PostgREST", () => {
     expect(got.find((c) => c.userId === "ana")?.lastAssignedAt).toBe(base + 1009 * 60_000);
   });
 });
+
+describe("setor da conversa restringe quem recebe", () => {
+  const equipe = {
+    user_organizations: [{ user_id: "ana" }, { user_id: "bia" }, { user_id: "caio" }],
+    attendant_availability: [
+      { user_id: "ana", capacity: 5, schedule: {} },
+      { user_id: "bia", capacity: 5, schedule: {} },
+      { user_id: "caio", capacity: 5, schedule: {} },
+    ],
+  };
+  const comSetor = { ...scope, setorId: "setor-tributario" } as const;
+
+  it("conversa com setor: elegíveis = elegíveis de hoje ∩ membros do setor", async () => {
+    const { db, filters } = fixture({
+      ...equipe,
+      setor_membros: [{ user_id: "bia" }, { user_id: "caio" }],
+    });
+    const got = await loadEligibleAttendants(db, "org", now, comSetor);
+    expect(got.map((c) => c.userId)).toEqual(["bia", "caio"]);
+    // A leitura dos membros carrega a organização: o client é admin (bypassa RLS).
+    expect(filters).toContainEqual(["setor_membros", "organization_id", "org"]);
+    expect(filters).toContainEqual(["setor_membros", "setor_id", "setor-tributario"]);
+  });
+
+  it("membro do setor fora do plantão não entra; ninguém elegível ⇒ [] (fica na fila)", async () => {
+    const { db } = fixture({
+      ...equipe,
+      attendant_availability: [{ user_id: "ana", capacity: 5, schedule: {} }],
+      setor_membros: [{ user_id: "bia" }],
+    });
+    // A ana está de plantão, mas não é do setor: a conversa NÃO cai para ela.
+    expect(await loadEligibleAttendants(db, "org", now, comSetor)).toEqual([]);
+  });
+
+  it("setor ∩ política do canal: o setor nunca devolve quem o canal tirou", async () => {
+    const { db } = fixture({
+      ...equipe,
+      channel_routing_policies: { id: "policy" },
+      channel_routing_responsibles: [{ user_id: "ana" }, { user_id: "bia" }],
+      setor_membros: [{ user_id: "bia" }, { user_id: "caio" }],
+    });
+    const got = await loadEligibleAttendants(db, "org", now, comSetor);
+    expect(got.map((c) => c.userId)).toEqual(["bia"]);
+  });
+
+  it("setor sem membro nenhum: comportamento de hoje (todos os elegíveis)", async () => {
+    const { db } = fixture({ ...equipe, setor_membros: [] });
+    const got = await loadEligibleAttendants(db, "org", now, comSetor);
+    expect(got.map((c) => c.userId)).toEqual(["ana", "bia", "caio"]);
+  });
+
+  it("conversa sem setor: nem consulta setor_membros", async () => {
+    const { db, filters } = fixture({ ...equipe });
+    const got = await loadEligibleAttendants(db, "org", now, { ...scope, setorId: null });
+    expect(got.map((c) => c.userId)).toEqual(["ana", "bia", "caio"]);
+    expect(filters.some(([table]) => table === "setor_membros")).toBe(false);
+  });
+
+  it("erro ao ler o setor não vira 'sem restrição'", async () => {
+    const { db } = fixture({ ...equipe, setor_membros: new Error("setor offline") });
+    await expect(loadEligibleAttendants(db, "org", now, comSetor)).rejects.toThrow("setor offline");
+  });
+});

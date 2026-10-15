@@ -145,7 +145,7 @@ async function processEvent(event: EventRow, now: Date): Promise<RoutingOutcome>
 
   const { data: conv, error: convError } = await admin
     .from("conversations")
-    .select("id, organization_id, contact_id, channel_session_id, assigned_to_user_id, status")
+    .select("id, organization_id, contact_id, channel_session_id, assigned_to_user_id, status, setor_id")
     .eq("id", conversationId)
     .eq("organization_id", orgId)
     .maybeSingle();
@@ -186,6 +186,9 @@ async function processEvent(event: EventRow, now: Date): Promise<RoutingOutcome>
     try {
       eligibles = await loadEligibleAttendants(admin, orgId, now, {
         kind: "conversation_channel", channelSessionId: conv.channel_session_id,
+        // Conversa com setor só vai para quem é do setor; sem ninguém dele
+        // elegível agora, o `decideRouting` reenfileira — fica na fila.
+        setorId: (conv as { setor_id?: string | null }).setor_id ?? null,
       });
     } catch (error) {
       if (!(error instanceof InvalidRoutingChannel)) throw error;
@@ -253,7 +256,16 @@ async function processEvent(event: EventRow, now: Date): Promise<RoutingOutcome>
     }
     case "requeue": {
       if (action.attempts >= config.max_retries) await notice(orgId, conversationId, "no_eligible");
-      await requeueEvent(event, now, action.attempts, { reason: "no_eligible" }, action.nextAttemptAt);
+      // O setor vai no rastro do reenfileiramento: "ninguém do Tributário
+      // de plantão" e "ninguém de plantão" pedem conversas diferentes.
+      const setorId = (conv as { setor_id?: string | null }).setor_id ?? null;
+      await requeueEvent(
+        event,
+        now,
+        action.attempts,
+        { reason: "no_eligible", ...(setorId ? { setor_id: setorId } : {}) },
+        action.nextAttemptAt,
+      );
       return "requeued_no_eligible";
     }
 

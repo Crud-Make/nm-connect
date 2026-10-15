@@ -78,7 +78,7 @@ export const crmRequestHumanHandoff: McpToolDefinition<typeof inputShape> = {
     // Conversation must belong to org (defense in depth — service role bypassa RLS).
     const { data: conv, error: convErr } = await ctx.supabase
       .from("conversations")
-      .select("id, organization_id, contact_id, channel_session_id, awaiting_since")
+      .select("id, organization_id, contact_id, channel_session_id, awaiting_since, setor_id")
       .eq("organization_id", ctx.organizationId)
       .eq("id", input.conversation_id)
       .maybeSingle();
@@ -142,8 +142,12 @@ export const crmRequestHumanHandoff: McpToolDefinition<typeof inputShape> = {
     if (result.triggered) {
       const now = new Date();
       // INB-12: mesmos elegíveis do worker de roteamento (G5) — um algoritmo só.
+      // Setor da conversa (gravado pelo roteador de IA): restringe a quem é do
+      // setor; sem ninguém do setor elegível, a conversa fica na fila
+      // (`lib/routing/setor.ts`) — o `target_user_id` não fura essa regra.
       const eligibles = await loadEligibleAttendants(ctx.supabase, ctx.organizationId, now, {
         kind: "conversation_channel", channelSessionId: conv.channel_session_id,
+        setorId: conv.setor_id ?? null,
       });
       const picked =
         input.target_user_id && eligibles.some((e) => e.userId === input.target_user_id)
@@ -208,6 +212,9 @@ export const crmRequestHumanHandoff: McpToolDefinition<typeof inputShape> = {
       position,
       // Compat com o contrato anterior (callers que liam assigned_to_user_id).
       assigned_to_user_id: assignedUserId,
+      // O setor que restringiu a escolha (null = sem setor). Na fila, diz de
+      // quem é a espera.
+      setor_id: conv.setor_id ?? null,
       idempotent: !result.triggered && result.reason === "idempotent_5s",
       // ⚠️ MUDOU. A frase anterior mandava avisar o cliente DEPOIS de o
       // orquestrador já ter avisado (ele manda a mensagem no passo 0), então o

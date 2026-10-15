@@ -40,6 +40,9 @@ interface StubState {
   queuePositionCount: number;
   allowed?: string[];
   claimResult?: string;
+  /** `conversations.setor_id` da conversa e os membros do setor. */
+  setorId?: string | null;
+  setorMembros?: string[];
   rpcCalls: Array<{ fn: string; args: Record<string, unknown> }>;
   updates: Array<{ table: string; values: Record<string, unknown> }>;
   inserts: Array<{ table: string; values: Record<string, unknown> }>;
@@ -77,6 +80,7 @@ function makeSupabaseStub(state: StubState) {
               organization_id: ORG_ID,
               contact_id: null, channel_session_id: CONV_ID, assigned_to_user_id: null,
               last_inbound_at: null,
+              setor_id: state.setorId ?? null,
             },
             error: null,
           });
@@ -88,6 +92,7 @@ function makeSupabaseStub(state: StubState) {
       then: (resolve: (v: unknown) => unknown) => {
         let result: { data?: unknown; count?: number; error: null } = { data: [], error: null };
         if (table === "user_organizations") result = { data: state.attendants.map(a => ({ user_id: a.user_id })), error: null };
+        else if (table === "setor_membros") result = { data: (state.setorMembros ?? []).map(user_id => ({ user_id })), error: null };
         else if (table === "channel_routing_responsibles") result = { data: (state.allowed ?? []).map(user_id => ({ user_id })), error: null };
         else if (table === "conversations" && state.updates.length) result = { data: [{ id: CONV_ID }], error: null };
         if (table === "attendant_availability") result = { data: state.attendants, error: null };
@@ -207,6 +212,33 @@ describe("crm_request_human_handoff v2 (INB-12 — roteamento G5 unificado)", ()
     const state = stubState({ allowed: [] });
     const result = await crmRequestHumanHandoff.handler({ ...baseInput, target_user_id: AGENT_ID }, makeCtx(state));
     expect(result).toMatchObject({ assigned_to: null, queued: true });
+    expect(state.rpcCalls.some(c => c.fn === "fn_channel_routing_claim")).toBe(false);
+  });
+  it("conversa com setor: só membro do setor recebe, mesmo com outro elegível", async () => {
+    const state = stubState({
+      attendants: [
+        { user_id: AGENT_ID, capacity: 5, schedule: {} },
+        { user_id: AGENT_B, capacity: 5, schedule: {} },
+      ],
+      setorId: "55555555-5555-4555-8555-555555555555",
+      setorMembros: [AGENT_B],
+    });
+    const result = await crmRequestHumanHandoff.handler(
+      // O alvo pedido está fora do setor: não vence a regra do setor.
+      { ...baseInput, target_user_id: AGENT_ID },
+      makeCtx(state),
+    );
+    expect(state.rpcCalls[0]?.args.p_user).toBe(AGENT_B);
+    expect(result).toMatchObject({ assigned_to: AGENT_B, queued: false });
+  });
+  it("setor sem ninguém elegível: fila (não cai para quem está fora do setor)", async () => {
+    const state = stubState({
+      attendants: [{ user_id: AGENT_ID, capacity: 5, schedule: {} }],
+      setorId: "55555555-5555-4555-8555-555555555555",
+      setorMembros: [AGENT_B],
+    });
+    const result = await crmRequestHumanHandoff.handler(baseInput, makeCtx(state));
+    expect(result).toMatchObject({ assigned_to: null, queued: true, setor_id: "55555555-5555-4555-8555-555555555555" });
     expect(state.rpcCalls.some(c => c.fn === "fn_channel_routing_claim")).toBe(false);
   });
   it("perda por revogação no claim não troca por alguém fora da lista", async () => {
