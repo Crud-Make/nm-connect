@@ -64,18 +64,19 @@ export interface BudgetStatus {
    * consulta, em `getBudgetStatus`).
    *
    * ⚠️ É O FURO DEBAIXO DA PROTEÇÃO INTEIRA, e por isso ele é um campo do
-   * contrato e não uma nota num doc. `pricing.ts` casa o `model` por id EXATO
-   * (tolerando o sufixo de data e o prefixo `provider/`, #1929) e devolve `null`
-   * para modelo fora da tabela — id da OpenRouter como `z-ai/glm-4.7` segue sem
-   * preço. A régua trata custo nulo
-   * como zero (`coalesce`), então nessas instalações o gasto medido é MENOR que
-   * o real — no limite, zero: o teto nunca dispara e o card mostra "US$ 0,00
-   * gastos" enquanto o dinheiro sai.
+   * contrato e não uma nota num doc. A régua trata custo nulo como zero
+   * (`coalesce`): onde o custo sai nulo, o gasto medido é MENOR que o real — no
+   * limite, zero: o teto nunca dispara e o card mostra "US$ 0,00 gastos"
+   * enquanto o dinheiro sai.
    *
-   * O conserto de raiz é o motor consultar `ai_models` (onde o catálogo da
-   * OpenRouter já grava preço real — `lib/ai/cost.ts`), e é item próprio. No
-   * intervalo, a tela não pode PROMETER uma parada que não vai acontecer: este
-   * campo é o que ela usa para dizer a verdade ao lado da opção.
+   * Era o caso de TODA instalação em OpenRouter: `pricing.ts` casa o `model` por
+   * id exato e devolvia `null` para `z-ai/glm-4.7`. Desde
+   * `lib/agent-engine/edge/llm/custo-da-chamada.ts` o motor grava o custo que a
+   * OpenRouter informa em `usage.cost` e, sem ele, o preço do catálogo
+   * (`ai_models`) — então nessas instalações este campo apaga sozinho, a partir
+   * das chamadas novas. Ele segue aceso, e com razão, para modelo sem preço em
+   * lugar nenhum (fora da tabela, fora do catálogo, provedor que não informa
+   * custo): a tela não pode PROMETER uma parada que não vai acontecer.
    */
   gasto_incompleto: boolean;
   /**
