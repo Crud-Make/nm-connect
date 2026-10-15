@@ -8,13 +8,15 @@ name: nm-ci
 # dependem de infra que não temos (executor próprio, GHCR, secrets, Supabase no
 # CI) ou fazem trabalho de release do produto deles.
 #
-# Este workflow roda só o que dá sinal de código sem secrets nem serviço:
-# typecheck, lint, lint:channels, lint:role-rank, cercas estruturais e a suíte
-# unitária (`--project produto`) em 3 partes — mesma forma do `verify-parte` de
-# ci.yml. O status check obrigatório da `main` é o job `nm-ci-ok`.
+# Este workflow roda typecheck, lint, lint:channels, lint:role-rank, cercas
+# estruturais e a suíte unitária (`--project produto`) em 3 partes — mesma forma
+# do `verify-parte` de ci.yml — e, na parte 4, o `test:db` (Postgres efêmero +
+# baseline install/update + invariantes, incluindo o isolamento RLS entre duas
+# organizações) e o `test:db:update` (update.sh sobre banco COM dados). O status
+# check obrigatório da `main` é o job `nm-ci-ok`.
 #
-# Fora daqui (de propósito, por enquanto): test:db (Postgres + invariantes RLS),
-# e2e, build de imagem, kit bash (test:shell).
+# Fora daqui (de propósito, por enquanto): e2e, build de imagem, kit bash
+# (test:shell).
 
 on:
   pull_request:
@@ -27,10 +29,15 @@ permissions:
 
 jobs:
   # Partes: 1 = typecheck + auditorias + unit 1/3; 2 = lint + unit 2/3;
-  # 3 = cercas + unit 3/3. `--project produto` é o `pnpm test:unit` menos as
-  # cercas, que rodam uma vez só, na parte 3.
+  # 3 = cercas + unit 3/3; 4 = test:db + test:db:update. `--project produto` é o
+  # `pnpm test:unit` menos as cercas, que rodam uma vez só, na parte 3.
+  #
+  # A parte 4 mora na MESMA matriz (e não num job novo) para continuar coberta
+  # pelo agregador `nm-ci-ok` sem acrescentar job ao mapa de
+  # tests/unit/gatilho-dos-jobs-de-entrega.test.ts. Teto de 30 min como o
+  # `invariants-majors` do upstream (duas passadas de banco).
   verify:
-    timeout-minutes: 20
+    timeout-minutes: ${{ matrix.parte == 4 && 30 || 20 }}
     runs-on: ubuntu-latest
     # Concurrency por job (não por workflow): o agregador `nm-ci-ok` roda com
     # `if: always()` e, num grupo de workflow, seguraria o grupo — ver o
@@ -41,7 +48,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        parte: [1, 2, 3]
+        parte: [1, 2, 3, 4]
+    env:
+      # Lida por scripts/test-db.sh e scripts/test-update-com-dados.sh. pg17 é a
+      # major do Supabase Cloud onde o NM Connect vai rodar; o piso pg15 segue
+      # vigiado pela cerca baseline-no-piso-do-postgres.
+      TEST_DB_IMAGE: pgvector/pgvector:pg17
     steps:
       - uses: actions/checkout@v7
 
@@ -73,7 +85,35 @@ jobs:
         run: pnpm cercas
 
       - name: Unit tests (parte ${{ matrix.parte }}/3)
+        if: matrix.parte != 4
         run: pnpm test:unit --project produto --shard=${{ matrix.parte }}/3
+
+      # O test:db confere o update.sh do checkout contra o da ÚLTIMA RELEASE
+      # PUBLICADA e o da v1.63.0 (scripts/conferir-isolamento-do-kit.sh). O
+      # nm-connect não publica releases nem tem as tags do upstream: sem este
+      # passo o script não acha release nenhuma e reprova. A referência vem do
+      # upstream (melgarafael/DeskcommCRM), e as duas tags são buscadas de lá,
+      # rasas, antes do script — que só busca no `origin` quando a tag falta.
+      - name: Release de referência do upstream (para o test:db)
+        if: matrix.parte == 4
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rel="$(gh release view -R melgarafael/DeskcommCRM --json tagName -q .tagName)"
+          case "$rel" in v[0-9]*) ;; *) echo "release do upstream ilegível: '$rel'" >&2; exit 1 ;; esac
+          for tag in "$rel" v1.63.0; do
+            git fetch -q --no-tags --depth=1 https://github.com/melgarafael/DeskcommCRM.git "+refs/tags/$tag:refs/tags/$tag"
+          done
+          echo "CONFERENCIA_KIT_RELEASE=$rel" >> "$GITHUB_ENV"
+          echo "release de referência: $rel"
+
+      - name: RLS isolation + governance invariants (test:db)
+        if: matrix.parte == 4
+        run: pnpm test:db
+
+      - name: update.sh sobre banco COM DADOS (test:db:update)
+        if: matrix.parte == 4
+        run: pnpm test:db:update
 
   # O NOME DESTE JOB É O STATUS CHECK OBRIGATÓRIO. Sem concurrency, de
   # propósito; `skipped` e `cancelled` reprovam — parte que não rodou não mediu.
