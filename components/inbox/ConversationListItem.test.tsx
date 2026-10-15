@@ -86,3 +86,26 @@ describe("ConversationListItem — bolinha de quem atende", () => {
     expect(screen.queryByRole("img", { name: "Em atendimento" })).toBeNull();
   });
 });
+
+/**
+ * O setor da conversa (migration 0675). É o que torna a espera visível: uma
+ * conversa do Tributário parada na Fila diz DE QUEM ela está esperando.
+ */
+describe("ConversationListItem — setor", () => {
+  it("conversa com setor mostra o nome do setor", () => {
+    render(
+      <ConversationListItem
+        conversation={{ ...conversaDeExemplo.conversation, setor_id: "s-trib" }}
+        {...conversaDeExemplo.props}
+        nomeDoSetor="Tributário"
+      />,
+    );
+    expect(screen.getByText("Tributário")).toBeInTheDocument();
+    expect(screen.getByTitle("Setor Tributário")).toBeInTheDocument();
+  });
+
+  it("sem setor, nenhum selo de setor", () => {
+    render(<ConversationListItem conversation={conversaDeExemplo.conversation} {...conversaDeExemplo.props} />);
+    expect(screen.queryByTitle(/^Setor /)).toBeNull();
+  });
+});

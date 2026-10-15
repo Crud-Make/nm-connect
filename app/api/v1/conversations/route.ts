@@ -68,6 +68,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     modo: url.searchParams.get("modo") ?? undefined,
     unread: url.searchParams.get("unread") ?? undefined,
     channel_session_id: url.searchParams.get("channel_session_id") ?? undefined,
+    // O setor (migration 0675). Mesma rotura possível de `tag`/`comando`: a
+    // cerca `rota-le-todo-filtro-do-schema` cobra a chave.
+    setor_id: url.searchParams.get("setor_id") ?? undefined,
     // A aba "Grupos" (Task 10) — mesma rotura que `tag`/`comando` já tiveram
     // aqui: schema aceita, hook serializa, handler filtra, e esta linha é o
     // único lugar que pode esquecer sem erro nenhum. `rota-le-todo-filtro-do-schema`

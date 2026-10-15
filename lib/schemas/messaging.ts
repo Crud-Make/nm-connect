@@ -330,6 +330,12 @@ export const listConversationsQuerySchema = z.object({
   assigned_to: z.union([z.string().uuid(), z.literal("me"), z.literal("unassigned")]).optional(),
   channel_session_id: z.string().uuid().optional(),
   /**
+   * O SETOR da conversa (migration 0675) — gravado pelo roteador de IA quando a
+   * intenção casada aponta um setor. Igualdade numa coluna, então o badge
+   * (`counts`) aplica o mesmo filtro pela lista de auxiliares.
+   */
+  setor_id: z.string().uuid().optional(),
+  /**
    * O MARCADOR, e agora VÁRIOS (#1274).
    *
    * Aceita `string` OU `string[]`, e a repetição na URL (`?tag=vip&tag=orçamento`)

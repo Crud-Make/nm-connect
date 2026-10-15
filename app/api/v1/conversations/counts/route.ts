@@ -54,6 +54,10 @@ export function filtrosAuxiliaresDaContagem(
   const filtros: FiltroDeContagem[] = [];
   const canal = sp.get("channel_session_id");
   if (canal) filtros.push(["channel_session_id", canal]);
+  // O setor (migration 0675) é igualdade numa coluna — entra na lista e vale
+  // para TODA contagem, como o canal.
+  const setor = sp.get("setor_id");
+  if (setor) filtros.push(["setor_id", setor]);
   // O MARCADOR não entra nesta lista, e não é esquecimento: ele não é
   // IGUALDADE numa coluna, é um `or=` sobre DUAS caixas — `conversations.tags`
   // e o campo calculado do contato. `conversations` não tem coluna `tag` (`tag`

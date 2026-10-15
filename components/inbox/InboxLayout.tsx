@@ -271,6 +271,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         ? filterValue.search
         : undefined,
       channel_session_id: filterValue.channel_session_id,
+      setor_id: filterValue.setor_id,
       tag: filterValue.tag,
       tagMode: filterValue.tagMode,
       unread: filterValue.onlyUnread || undefined,
@@ -281,6 +282,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       automaticoDaOrg,
       filterValue.search,
       filterValue.channel_session_id,
+      filterValue.setor_id,
       filterValue.tag,
       filterValue.tagMode,
       filterValue.onlyUnread,

@@ -44,6 +44,12 @@ import {
   type InboxFiltersValue,
 } from "@/components/inbox/InboxFilters";
 
+// Setores (migration 0675): a inbox nomeia e filtra por setor. Sem setor
+// nenhum na organização, o filtro e os selos não aparecem — a tela de sempre.
+vi.mock("@/hooks/team/useSetores", async (original) => ({
+  ...(await original<Record<string, unknown>>()),
+  useSetores: () => ({ data: undefined }),
+}));
 vi.mock("@/hooks/auth/AuthProvider", () => ({
   useAuth: () => ({
     activeOrg: { orgId: "org-1", name: "Org", role: "manager", visibility_mode: "all" },

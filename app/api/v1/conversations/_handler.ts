@@ -88,7 +88,7 @@ const SELECT_COLS = `
   id, organization_id, contact_id, channel_session_id, channel, status,
   status_changed_at, service_revision, service_closed_at, service_started_at, current_demanda_id, assigned_to_user_id, assigned_to_user_name, assignee_kind, assigned_at, last_inbound_at, awaiting_since,
   last_outbound_at, last_message_at, last_message_preview,
-  unread_count_for_assignee, is_group, group_chat_id, tags, metadata,
+  unread_count_for_assignee, is_group, group_chat_id, tags, metadata, setor_id,
   snooze_until, created_at, updated_at,
   bot_silenced_until, last_handoff_at, last_handoff_reason,
   comando_da_conversa,
@@ -233,6 +233,9 @@ export async function listConversationsHandler(
     query = query.not("status", "in", `(${CONVERSATION_TERMINAL_STATUSES.join(",")})`);
   }
   if (q.channel_session_id) query = query.eq("channel_session_id", q.channel_session_id);
+  // O setor (migration 0675): igualdade na coluna, na MESMA query que já leva
+  // `organization_id` — o admin client passa por cima da RLS.
+  if (q.setor_id) query = query.eq("setor_id", q.setor_id);
   // Canal desativado nunca entra na inbox (quarentena): exclui as conversas
   // dele aqui e nos badges, mantendo o acesso direto por id para auditoria e
   // suporte. Reativou, reaparecem sem reimportar nada.

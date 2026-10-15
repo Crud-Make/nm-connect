@@ -25,6 +25,11 @@ export interface Conversation {
   assigned_to_user_name: string | null;
   assignee_kind: string | null;
   assigned_at: string | null;
+  /**
+   * Setor do atendimento (migration 0675). Opcional cobrindo o intervalo entre
+   * o deploy e a migration; `null` = conversa sem setor.
+   */
+  setor_id?: string | null;
   last_inbound_at: string | null;
   /**
    * A régua da Fila (migration 0267, issue #990): o instante da mensagem do

@@ -47,6 +47,11 @@ vi.mock("@/hooks/contacts/usePersonalContact", () => ({
 vi.mock("@/hooks/ai/useAutomaticoAtivo", () => ({
   useAutomaticoAtivo: () => ({ data: false }),
 }));
+// 0675 — o nome do setor sai da lista de setores da organização.
+vi.mock("@/hooks/team/useSetores", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useSetores: () => ({ data: { data: [{ id: "s-trib", nome: "Tributário", membros: [], created_at: "" }] } }),
+}));
 vi.mock("@/components/kanban/OwnerBadge", () => ({ OwnerBadge: () => null }));
 vi.mock("@/components/inbox/ReassignDialog", () => ({ ReassignDialog: () => null }));
 vi.mock("@/components/inbox/SnoozeButton", () => ({ SnoozeButton: () => null }));
@@ -213,5 +218,19 @@ describe("ConversationHeader — busca dentro da conversa (#1793)", () => {
     expect(buscar).toHaveBeenCalledOnce();
     expect(closeMutate).not.toHaveBeenCalled();
     expect(arquivarMutate).not.toHaveBeenCalled();
+  });
+});
+
+describe("ConversationHeader — setor da conversa (0675)", () => {
+  it("conversa com setor mostra o nome do setor no cabeçalho", () => {
+    const atual = conversa("pending");
+    (atual as { setor_id?: string | null }).setor_id = "s-trib";
+    render(<ConversationHeader conversation={atual} />);
+    expect(screen.getByTestId("setor-da-conversa")).toHaveTextContent("Tributário");
+  });
+
+  it("conversa sem setor: nenhum selo de setor", () => {
+    render(<ConversationHeader conversation={conversa("pending")} />);
+    expect(screen.queryByTestId("setor-da-conversa")).toBeNull();
   });
 });

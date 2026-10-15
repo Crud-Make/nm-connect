@@ -44,6 +44,7 @@ import type { ConversationWithContact } from "@/hooks/inbox/useConversationsReal
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
 import { rotuloDoCanalDaConversa } from "@/lib/channels/estado";
+import { useSetores } from "@/hooks/team/useSetores";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -116,6 +117,14 @@ export function ConversationHeader({
    * canais (#2383). `null` quando não há canal, e aí o badge não existe.
    */
   const rotuloCanal = rotuloDoCanalDaConversa(conversation.channel_sessions, t);
+  /**
+   * O SETOR desta conversa (migration 0675) — para onde o roteador de IA a
+   * levou. Quem abre a conversa vê de que área ela é sem procurar na lista.
+   */
+  const { data: setoresRes } = useSetores();
+  const nomeDoSetor = conversation.setor_id
+    ? (setoresRes?.data.find((s) => s.id === conversation.setor_id)?.nome ?? null)
+    : null;
   const phone = c?.phone_number ? phoneForDisplay(c.phone_number) : null;
   const status = conversation.status;
   const isMineAssigned = conversation.assigned_to_user_id === user.id;
@@ -247,6 +256,16 @@ export function ConversationHeader({
               data-testid="canal-da-conversa"
             >
               <span className="truncate">{rotuloCanal}</span>
+            </Badge>
+          )}
+          {nomeDoSetor && (
+            <Badge
+              variant="secondary"
+              className="h-4 min-w-0 max-w-[9rem] truncate px-1.5 text-[10px]"
+              title={`${t("Setor")} ${nomeDoSetor}`}
+              data-testid="setor-da-conversa"
+            >
+              <span className="truncate">{nomeDoSetor}</span>
             </Badge>
           )}
         </div>
