@@ -348,6 +348,13 @@ export async function redriveQueued(
   // As que este resgate NÃO alcança. Não são reenviadas daqui — enviar em dobro
   // é pior que não enviar, e este processo não tem como saber se o outro
   // caminho já mandou. O que elas não podem continuar sendo é INVISÍVEIS.
+  //
+  // Quem as torna visíveis é o cron `recover-stuck-messages`
+  // (`recoverStuckQueued`): sem job dono vivo, viram `failed` com aviso na
+  // Central. Lá, e não aqui, porque este watchdog só liga quando o env tem as
+  // credenciais deste transporte — numa instalação só com o canal oficial ele
+  // não existe, e a mensagem presa ficaria sem ninguém. Este warn segue como
+  // sinal do intervalo entre a mensagem travar e a próxima rodada do cron.
   const { rows: foraDoAlcance } = await pool.query<{ n: string }>(
     `select count(*)::text as n
      from messages m

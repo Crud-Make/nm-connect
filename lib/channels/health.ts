@@ -66,6 +66,17 @@ export const REF_KIND_SESSAO = "channel_session";
 export const DETALHE_CREDENCIAL_RECUSADA = "credencial_recusada_pelo_transporte";
 
 /**
+ * O ENVIO recebeu "token inválido" da plataforma (`credencial-recusada-no-envio.ts`).
+ *
+ * Diferente de `DETALHE_CREDENCIAL_RECUSADA`, que é a chave da INSTALAÇÃO com o
+ * servidor de transporte: aqui é o token desta conexão, e o conserto é
+ * atualizá-lo em Conexões. O episódio é o MESMO `FAILED` que o vigia grava ao
+ * ver o token recusado — senão a rodada seguinte abriria um segundo aviso do
+ * mesmo problema.
+ */
+export const DETALHE_TOKEN_RECUSADO_NO_ENVIO = "token_recusado_no_envio";
+
+/**
  * Marca do episódio aberto por um EMPURRÃO do provedor.
  *
  * A varredura não fecha episódio com esta marca: ela mede credencial e conta,
@@ -142,6 +153,16 @@ export function avisoDaConexao(saude: SaudeObservada, apelido: string): AvisoDeC
       severity: "critical",
       title: `WhatsApp "${apelido}" desconectado — precisa escanear o QR de novo`,
       body: "Enquanto isso não acontecer, nenhuma mensagem entra nem sai por esta conexão.",
+      episodio: status,
+    };
+  }
+
+  if (status === "FAILED" && saude.detail === DETALHE_TOKEN_RECUSADO_NO_ENVIO) {
+    return {
+      kind: "channel_number_alert",
+      severity: "critical",
+      title: `WhatsApp "${apelido}": o token de acesso foi recusado`,
+      body: "O envio de uma mensagem foi recusado porque o token desta conexão venceu ou foi revogado. Nenhuma mensagem sai por ela até um novo token ser gravado em Conexões.",
       episodio: status,
     };
   }
