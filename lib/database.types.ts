@@ -2776,6 +2776,7 @@ export type Database = {
           pipeline_id: string | null
           position: number
           router_id: string
+          setor_id: string | null
           stage_id: string | null
           updated_at: string
         }
@@ -2791,6 +2792,7 @@ export type Database = {
           pipeline_id?: string | null
           position?: number
           router_id: string
+          setor_id?: string | null
           stage_id?: string | null
           updated_at?: string
         }
@@ -2806,6 +2808,7 @@ export type Database = {
           pipeline_id?: string | null
           position?: number
           router_id?: string
+          setor_id?: string | null
           stage_id?: string | null
           updated_at?: string
         }
@@ -4896,6 +4899,7 @@ export type Database = {
           service_closed_at: string | null
           service_revision: number
           service_started_at: string | null
+          setor_id: string | null
           snooze_until: string | null
           snoozed_at: string | null
           snoozed_by_user_id: string | null
@@ -4941,6 +4945,7 @@ export type Database = {
           service_closed_at?: string | null
           service_revision?: number
           service_started_at?: string | null
+          setor_id?: string | null
           snooze_until?: string | null
           snoozed_at?: string | null
           snoozed_by_user_id?: string | null
@@ -4986,6 +4991,7 @@ export type Database = {
           service_closed_at?: string | null
           service_revision?: number
           service_started_at?: string | null
+          setor_id?: string | null
           snooze_until?: string | null
           snoozed_at?: string | null
           snoozed_by_user_id?: string | null
@@ -9157,6 +9163,64 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "reentry_template_versions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      setores: {
+        Row: {
+          created_at: string
+          id: string
+          nome: string
+          organization_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome: string
+          organization_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setores_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      setor_membros: {
+        Row: {
+          created_at: string
+          organization_id: string
+          setor_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          organization_id: string
+          setor_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          organization_id?: string
+          setor_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "setor_membros_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
