@@ -62,11 +62,32 @@ export function verifyMetaSignature(
   const [algo, received] = signatureHeader.split("=");
   if (algo !== "sha256" || !received) return false;
 
-  const expected = createHmac("sha256", appSecret).update(rawBody, "utf8").digest("hex");
-  // timingSafeEqual estoura se os tamanhos diferem — comparar antes evita
-  // transformar assinatura malformada em exceção 500.
-  if (received.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(received, "hex"), Buffer.from(expected, "hex"));
+  // O formato vem ANTES do Buffer: `Buffer.from(x, "hex")` não lança com lixo,
+  // ele PARA no primeiro caractere não-hex. Uma assinatura de 64 caracteres
+  // `z` passava na comparação de tamanho das strings, virava Buffer vazio, e o
+  // `timingSafeEqual` lançava ERR_CRYPTO_TIMING_SAFE_EQUAL_LENGTH — 500 em vez
+  // de 401, e a Meta (ou quem estivesse sondando) recebia um erro de servidor.
+  if (!/^[0-9a-f]{64}$/i.test(received)) return false;
+
+  const expected = createHmac("sha256", appSecret).update(rawBody, "utf8").digest();
+  const recebida = Buffer.from(received, "hex");
+  // Redundante com a regex (64 hex = 32 bytes), e de propósito: é a pré-condição
+  // do `timingSafeEqual`, e ela fica escrita junto dele em vez de inferida.
+  if (recebida.length !== expected.length) return false;
+  return timingSafeEqual(recebida, expected);
+}
+
+/**
+ * `timestamp` da Meta → `Date`. Ela manda epoch em SEGUNDOS, como string
+ * (`"1785342028"`); aceitar número também não custa. Qualquer outra coisa —
+ * ausente, vazio, não numérico, zero, negativo — vira `null` em vez de 1970 ou
+ * `Invalid Date`, que o `toISOString()` de quem grava faria lançar.
+ */
+export function epochEmSegundos(v: unknown): Date | null {
+  const n = typeof v === "number" ? v : typeof v === "string" && /^\d+$/.test(v) ? Number(v) : NaN;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const d = new Date(n * 1000);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 /** Resposta do handshake de verificação (GET). `null` = recusar com 403. */
@@ -148,6 +169,13 @@ export interface MessageStatusEvent {
   recipient: string | null;
   errorCode: number | null;
   errorTitle: string | null;
+  /**
+   * Quando o status ACONTECEU, segundo a Meta (`statuses[].timestamp`, epoch em
+   * segundos). `null` quando ausente ou ilegível — aí quem grava usa a hora de
+   * recebimento. Existe porque a Meta reentrega e entrega fora de ordem: a hora
+   * em que o webhook chegou não é a hora em que a mensagem foi entregue/lida.
+   */
+  occurredAt: Date | null;
 }
 
 /**
@@ -356,6 +384,7 @@ export function parseMetaWebhook(envelope: MetaWebhookEnvelope): MetaWebhookEven
             recipient: str(raw.recipient_id),
             errorCode: typeof first.code === "number" ? first.code : null,
             errorTitle: str(first.title),
+            occurredAt: epochEmSegundos(raw.timestamp),
           });
         }
       }
