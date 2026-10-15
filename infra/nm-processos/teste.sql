@@ -11,62 +11,130 @@
 begin;
 
 -- ── Massa de teste ─────────────────────────────────────────────────────────
--- Ana tem dois processos: um com andamento liberado (e um mais novo ainda em
--- revisão) e outro sem nada liberado. Bruno tem um processo próprio.
-insert into escritorio.clientes (id, nome, telefone_whatsapp, cpf_confere) values
-  ('00000000-0000-0000-0000-00000000000a', 'Ana Teste',   '+5511987654321', '472'),
-  ('00000000-0000-0000-0000-00000000000b', 'Bruno Teste', '+5531988887777', '901');
+-- Pessoas são quem fala no WhatsApp. Clientes são PF ou PJ.
+--   Ana    titular da PF "Ana Teste" (dois processos).
+--   Bruno  titular da PF "Bruno Teste" (um processo).
+--   Carla  sócia da PJ "Empresa XYZ" (um processo da empresa).
+--   Davi   contador da Empresa XYZ.
+insert into escritorio.pessoas (id, nome, telefone_whatsapp, cpf_confere) values
+  ('00000000-0000-0000-0000-0000000000f1', 'Ana Teste',   '+5511987654321', '472'),
+  ('00000000-0000-0000-0000-0000000000f2', 'Bruno Teste', '+5531988887777', '901'),
+  ('00000000-0000-0000-0000-0000000000f3', 'Carla Sócia', '+5521977776666', '345'),
+  ('00000000-0000-0000-0000-0000000000f4', 'Davi Contador', '+5521966665555', '678');
+
+insert into escritorio.clientes (id, tipo, nome, cnpj) values
+  ('00000000-0000-0000-0000-00000000000a', 'PF', 'Ana Teste',   null),
+  ('00000000-0000-0000-0000-00000000000b', 'PF', 'Bruno Teste', null),
+  ('00000000-0000-0000-0000-00000000000c', 'PJ', 'Empresa XYZ Ltda', '12345678000199');
+
+insert into escritorio.cliente_pessoas (cliente_id, pessoa_id, papel) values
+  ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000f1', 'titular'),
+  ('00000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-0000000000f2', 'titular'),
+  ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-0000000000f3', 'socio'),
+  ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-0000000000f4', 'contador');
 
 insert into escritorio.processos (id, numero_cnj, apelido, area, fase, advogado_responsavel) values
-  ('00000000-0000-0000-0000-0000000000a1', '0001234-56.2025.5.02.0001', 'Trabalhista contra Empresa X', 'Trabalhista', 'Aguardando sentença', 'Dr. Responsável'),
-  ('00000000-0000-0000-0000-0000000000a2', '0007654-32.2026.8.26.0100', 'Revisional do financiamento', 'Cível', 'Inicial', 'Dra. Responsável'),
-  ('00000000-0000-0000-0000-0000000000b1', '0009999-11.2026.8.13.0024', 'Ação do Bruno', 'Cível', 'Citação', 'Dr. Responsável');
+  ('00000000-0000-0000-0000-0000000000a1', '0001234-56.2025.5.02.0001', 'Aposentadoria por idade', 'Previdenciário', 'Aguardando perícia', 'Dr. Responsável'),
+  ('00000000-0000-0000-0000-0000000000a2', '0007654-32.2026.8.26.0100', 'Revisão do benefício', 'Previdenciário', 'Inicial', 'Dra. Responsável'),
+  ('00000000-0000-0000-0000-0000000000b1', '0009999-11.2026.8.13.0024', 'Ação do Bruno', 'Cível', 'Citação', 'Dr. Responsável'),
+  ('00000000-0000-0000-0000-0000000000c1', '0005555-22.2026.4.02.5101', 'Execução fiscal da XYZ', 'Tributário', 'Embargos', 'Dr. Tributário');
 
 insert into escritorio.cliente_processo (cliente_id, processo_id) values
   ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000a1'),
   ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000a2'),
-  ('00000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-0000000000b1');
+  ('00000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-0000000000b1'),
+  ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-0000000000c1');
 
 insert into escritorio.andamentos
   (processo_id, data, texto_para_cliente, proximo_passo, liberado_para_cliente, revisado_por, revisado_em) values
-  ('00000000-0000-0000-0000-0000000000a1', '2026-10-01', 'A audiência foi realizada.', 'Aguardar a decisão do juiz.', true, 'Dr. Responsável', now()),
+  ('00000000-0000-0000-0000-0000000000a1', '2026-10-01', 'A perícia foi marcada.', 'Comparecer à perícia.', true, 'Dr. Responsável', now()),
   ('00000000-0000-0000-0000-0000000000a1', '2026-10-10', 'RASCUNHO NÃO REVISADO', null, false, null, null),
   ('00000000-0000-0000-0000-0000000000a2', '2026-10-05', 'RASCUNHO DO OUTRO PROCESSO', null, false, null, null),
-  ('00000000-0000-0000-0000-0000000000b1', '2026-10-02', 'O réu foi citado.', null, true, 'Dr. Responsável', now());
+  ('00000000-0000-0000-0000-0000000000b1', '2026-10-02', 'O réu foi citado.', null, true, 'Dr. Responsável', now()),
+  ('00000000-0000-0000-0000-0000000000c1', '2026-10-03', 'Os embargos foram protocolados.', null, true, 'Dr. Tributário', now());
 
 -- ── 1. Regras de cadastro ──────────────────────────────────────────────────
 do $$
 begin
   begin
-    insert into escritorio.clientes (nome, telefone_whatsapp, cpf_confere) values ('X', '11987654321', '123');
+    insert into escritorio.pessoas (nome, telefone_whatsapp, cpf_confere) values ('X', '11987654321', '123');
     raise exception 'FALHOU: telefone sem +DDI foi aceito';
   exception when check_violation then null;
   end;
   begin
-    insert into escritorio.clientes (nome, telefone_whatsapp, cpf_confere) values ('X', null, '123');
-    raise exception 'FALHOU: cliente sem telefone foi aceito';
+    insert into escritorio.pessoas (nome, telefone_whatsapp, cpf_confere) values ('X', null, '123');
+    raise exception 'FALHOU: pessoa sem telefone foi aceita';
   exception when not_null_violation then null;
   end;
-  -- Um telefone, um cliente: com dois donos, o mesmo WhatsApp veria os
+  -- Um telefone, uma pessoa: com dois donos, o mesmo WhatsApp veria os
   -- processos dos dois. Vale também para a grafia sem o nono dígito.
   begin
-    insert into escritorio.clientes (nome, telefone_whatsapp, cpf_confere) values ('X', '+5511987654321', '123');
+    insert into escritorio.pessoas (nome, telefone_whatsapp, cpf_confere) values ('X', '+5511987654321', '123');
     raise exception 'FALHOU: telefone repetido foi aceito';
   exception when unique_violation then null;
   end;
   begin
-    insert into escritorio.clientes (nome, telefone_whatsapp, cpf_confere) values ('X', '+551187654321', '123');
+    insert into escritorio.pessoas (nome, telefone_whatsapp, cpf_confere) values ('X', '+551187654321', '123');
     raise exception 'FALHOU: telefone repetido sem o nono dígito foi aceito';
   exception when unique_violation then null;
   end;
   begin
-    insert into escritorio.clientes (nome, telefone_whatsapp, cpf_confere) values ('X', '+5511900000000', '12');
+    insert into escritorio.pessoas (nome, telefone_whatsapp, cpf_confere) values ('X', '+5511900000000', '12');
     raise exception 'FALHOU: cpf_confere com 2 dígitos foi aceito';
   exception when check_violation then null;
   end;
   begin
-    insert into escritorio.clientes (nome, telefone_whatsapp, cpf_confere) values ('X', '+5511900000000', '12345678901');
+    insert into escritorio.pessoas (nome, telefone_whatsapp, cpf_confere) values ('X', '+5511900000000', '12345678901');
     raise exception 'FALHOU: CPF inteiro foi aceito em cpf_confere';
+  exception when check_violation then null;
+  end;
+  -- PF não tem CNPJ; PJ precisa de CNPJ com 14 dígitos.
+  begin
+    insert into escritorio.clientes (tipo, nome, cnpj) values ('PJ', 'Sem CNPJ', null);
+    raise exception 'FALHOU: PJ sem CNPJ foi aceita';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into escritorio.clientes (tipo, nome, cnpj) values ('PF', 'Com CNPJ', '12345678000199');
+    raise exception 'FALHOU: PF com CNPJ foi aceita';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into escritorio.clientes (tipo, nome, cnpj) values ('PJ', 'CNPJ curto', '1234');
+    raise exception 'FALHOU: CNPJ com formato errado foi aceito';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into escritorio.clientes (tipo, nome, cnpj) values ('PJ', 'CNPJ repetido', '12345678000199');
+    raise exception 'FALHOU: CNPJ repetido foi aceito';
+  exception when unique_violation then null;
+  end;
+  begin
+    insert into escritorio.clientes (tipo, nome) values ('ONG', 'Tipo inválido');
+    raise exception 'FALHOU: tipo de cliente inválido foi aceito';
+  exception when check_violation then null;
+  end;
+  begin
+    insert into escritorio.cliente_pessoas (cliente_id, pessoa_id, papel)
+      values ('00000000-0000-0000-0000-00000000000c', '00000000-0000-0000-0000-0000000000f1', 'vizinho');
+    raise exception 'FALHOU: papel inválido foi aceito';
+  exception when check_violation then null;
+  end;
+  -- Documento é do cliente; o processo é opcional, mas tem de ser DELE.
+  insert into escritorio.documentos (cliente_id, processo_id, tipo, nome_arquivo, caminho_storage, origem)
+    values ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000a1',
+            'cnis', 'cnis-ana.pdf', 'clientes/a/cnis-ana.pdf', 'whatsapp');
+  begin
+    insert into escritorio.documentos (cliente_id, processo_id, tipo, nome_arquivo, caminho_storage, origem)
+      values ('00000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000c1',
+              'outro', 'x.pdf', 'clientes/a/x.pdf', 'equipe');
+    raise exception 'FALHOU: documento ligado a processo de outro cliente foi aceito';
+  exception when foreign_key_violation then null;
+  end;
+  begin
+    insert into escritorio.documentos (cliente_id, tipo, nome_arquivo, caminho_storage, origem)
+      values ('00000000-0000-0000-0000-00000000000a', 'outro', 'x.pdf', 'clientes/a/x.pdf', 'pombo');
+    raise exception 'FALHOU: origem de documento inválida foi aceita';
   exception when check_violation then null;
   end;
   begin
@@ -126,6 +194,11 @@ declare n int;
 begin
   -- Tabelas reais: fora do alcance.
   begin
+    perform 1 from escritorio.pessoas limit 1;
+    raise exception 'FALHOU: crm_leitor leu escritorio.pessoas';
+  exception when insufficient_privilege then null;
+  end;
+  begin
     perform 1 from escritorio.clientes limit 1;
     raise exception 'FALHOU: crm_leitor leu escritorio.clientes';
   exception when insufficient_privilege then null;
@@ -133,6 +206,11 @@ begin
   begin
     perform 1 from escritorio.andamentos limit 1;
     raise exception 'FALHOU: crm_leitor leu escritorio.andamentos';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform 1 from escritorio.documentos limit 1;
+    raise exception 'FALHOU: crm_leitor leu escritorio.documentos';
   exception when insufficient_privilege then null;
   end;
 
@@ -144,11 +222,11 @@ begin
     raise exception 'FALHOU: crm_leitor enxerga % objeto(s) fora do schema ia', n;
   end if;
 
-  -- Nenhuma coluna de CPF nas views.
+  -- Nenhuma coluna de CPF nem de CNPJ nas views.
   select count(*) into n from information_schema.columns
-   where table_schema = 'ia' and column_name ilike '%cpf%';
+   where table_schema = 'ia' and (column_name ilike '%cpf%' or column_name ilike '%cnpj%');
   if n <> 0 then
-    raise exception 'FALHOU: view da IA expõe coluna de CPF';
+    raise exception 'FALHOU: view da IA expõe coluna de CPF/CNPJ';
   end if;
 
   -- Ana: dois processos, pelo telefone com ou sem o nono dígito.
@@ -159,13 +237,13 @@ begin
 
   -- O último andamento mostrado é o LIBERADO, não o rascunho mais novo.
   perform 1 from ia.processos
-   where telefone = '+5511987654321' and apelido = 'Trabalhista contra Empresa X'
-     and ultimo_andamento = 'A audiência foi realizada.';
+   where telefone = '+5511987654321' and apelido = 'Aposentadoria por idade'
+     and ultimo_andamento = 'A perícia foi marcada.';
   if not found then raise exception 'FALHOU: último andamento não é o liberado'; end if;
 
   -- Processo sem nada liberado aparece, mas sem andamento.
   perform 1 from ia.processos
-   where telefone = '+5511987654321' and apelido = 'Revisional do financiamento'
+   where telefone = '+5511987654321' and apelido = 'Revisão do benefício'
      and ultimo_andamento is null;
   if not found then raise exception 'FALHOU: processo sem andamento liberado sumiu ou mostrou rascunho'; end if;
 
@@ -175,9 +253,21 @@ begin
   select count(distinct texto_para_cliente) into n from ia.andamentos where telefone = '+5511987654321';
   if n <> 1 then raise exception 'FALHOU: Ana deveria ver 1 andamento liberado, viu %', n; end if;
 
-  -- Ana não vê o processo do Bruno.
-  select count(*) into n from ia.processos where telefone = '+5511987654321' and apelido = 'Ação do Bruno';
-  if n <> 0 then raise exception 'FALHOU: processo do Bruno apareceu para a Ana'; end if;
+  -- Ana não vê o processo do Bruno nem o da empresa.
+  select count(*) into n from ia.processos
+   where telefone = '+5511987654321' and apelido in ('Ação do Bruno', 'Execução fiscal da XYZ');
+  if n <> 0 then raise exception 'FALHOU: Ana viu processo que não é dela'; end if;
+
+  -- PJ: sócia e contador veem o processo da empresa, com o nome do cliente.
+  perform 1 from ia.processos
+   where telefone = '+5521977776666' and apelido = 'Execução fiscal da XYZ'
+     and cliente = 'Empresa XYZ Ltda' and tipo_cliente = 'PJ' and papel = 'socio';
+  if not found then raise exception 'FALHOU: sócia não viu o processo da empresa'; end if;
+  perform 1 from ia.processos
+   where telefone = '+5521966665555' and apelido = 'Execução fiscal da XYZ' and papel = 'contador';
+  if not found then raise exception 'FALHOU: contador autorizado não viu o processo da empresa'; end if;
+  select count(*) into n from ia.andamentos where telefone = '+5521977776666';
+  if n <> 1 then raise exception 'FALHOU: sócia deveria ver 1 andamento da empresa, viu %', n; end if;
 
   -- Conferência do CPF: só sim ou não, e só para o dono do telefone.
   if not ia.conferir_cpf('+5511987654321', '472') then raise exception 'FALHOU: CPF certo não conferiu'; end if;
@@ -187,6 +277,9 @@ begin
   if ia.conferir_cpf('+5511900000000', '472') then raise exception 'FALHOU: telefone desconhecido conferiu'; end if;
   if ia.conferir_cpf('+5511987654321', '') then raise exception 'FALHOU: dígitos vazios conferiram'; end if;
   if ia.conferir_cpf('+5511987654321', null) then raise exception 'FALHOU: dígitos nulos conferiram'; end if;
+  -- Na PJ confere o CPF de QUEM fala (a pessoa autorizada), não da empresa.
+  if not ia.conferir_cpf('+5521977776666', '345') then raise exception 'FALHOU: CPF da sócia não conferiu'; end if;
+  if ia.conferir_cpf('+5521977776666', '678') then raise exception 'FALHOU: CPF do contador conferiu no telefone da sócia'; end if;
 end $$;
 
 reset role;
