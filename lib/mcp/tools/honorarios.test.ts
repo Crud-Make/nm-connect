@@ -8,9 +8,13 @@ const ORG_ID = "22222222-2222-4222-8222-222222222222";
 function ctxDe(
   resultado: { data: unknown; error: { code?: string; message?: string } | null },
   filtrosVistos: Array<{ coluna: string; valor: unknown }> = [],
+  selecoesVistas: string[] = [],
 ): McpContext {
   const query = {
-    select: () => query,
+    select: (colunas: string) => {
+      selecoesVistas.push(colunas);
+      return query;
+    },
     eq: (coluna: string, valor: unknown) => {
       filtrosVistos.push({ coluna, valor });
       return query;
@@ -45,6 +49,34 @@ describe("crm_get_honorarios_contrato", () => {
       { coluna: "organization_id", valor: ORG_ID },
       { coluna: "lead_id", valor: "11111111-1111-4111-8111-111111111111" },
     ]);
+  });
+
+  it("não devolve ao modelo o repasse do advogado (divisão interna do escritório)", async () => {
+    const selecoes: string[] = [];
+    // A linha vem COM o repasse, como viria de um select largo: a resposta tem
+    // de deixá-lo de fora mesmo assim — e a seleção nem deve pedi-lo.
+    const linha = {
+      id: "c1",
+      modelo: "misto",
+      valor_fixo_cents: 500000,
+      percentual_exito: 20,
+      repasse_advogado_pct: 37.5,
+    };
+    const ctx = ctxDe({ data: linha, error: null }, [], selecoes);
+
+    const resultado = await crmGetHonorariosContrato.handler(
+      { lead_id: "11111111-1111-4111-8111-111111111111" },
+      ctx,
+    );
+
+    expect(resultado).toEqual({
+      contrato: { id: "c1", modelo: "misto", valor_fixo_cents: 500000, percentual_exito: 20 },
+    });
+    const serializado = JSON.stringify(resultado);
+    expect(serializado).not.toContain("repasse_advogado_pct");
+    expect(serializado).not.toContain("37.5");
+    expect(selecoes).toHaveLength(1);
+    expect(selecoes[0]).not.toContain("repasse");
   });
 
   it("devolve contrato: null quando o caso não tem contrato — não é erro", async () => {

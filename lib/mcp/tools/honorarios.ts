@@ -45,7 +45,7 @@ export const crmGetHonorariosContrato: McpToolDefinition<typeof contratoInputSha
     // ── O CONTRATO DE QUEM NÃO É DESTA CONVERSA NÃO SE LÊ AQUI (#2184) ─────
     //
     // Mesmo escopo do #2178 nas leituras de conversa, e pela MESMA razão: o
-    // contrato traz valor, percentual e repasse — dado que, uma vez lido, vai
+    // contrato traz valor e percentual — dado que, uma vez lido, vai
     // para o WhatsApp de quem está do outro lado, encaminhável, sem volta. A
     // consulta filtra `organization_id`, então não há vazamento entre
     // ORGANIZAÇÕES; o alcance que muda é o de dentro dela.
@@ -88,9 +88,17 @@ export const crmGetHonorariosContrato: McpToolDefinition<typeof contratoInputSha
       }
     }
 
+    // ── O REPASSE DO ADVOGADO NÃO SAI DAQUI ──────────────────────────────
+    //
+    // `repasse_advogado_pct` é a divisão INTERNA do escritório (quanto do
+    // honorário vai para o advogado) — não é dado do cliente, e esta tool é
+    // lida pelo modelo que conversa com o cliente. A tela de honorários lê a
+    // tabela direto (`app/api/v1/honorarios/contratos`), não por aqui.
+    // A seleção não pede a coluna e a resposta é montada campo a campo: mesmo
+    // que a linha venha com mais colunas, só o que o cliente pode ouvir sai.
     const { data, error } = await ctx.supabase
       .from("honorarios_contratos")
-      .select("id, modelo, valor_fixo_cents, percentual_exito, repasse_advogado_pct")
+      .select("id, modelo, valor_fixo_cents, percentual_exito")
       .eq("organization_id", ctx.organizationId)
       .eq("lead_id", input.lead_id)
       .maybeSingle();
@@ -102,7 +110,15 @@ export const crmGetHonorariosContrato: McpToolDefinition<typeof contratoInputSha
       throw new Error(`honorarios_contrato_falhou: ${error.message}`);
     }
 
-    return { contrato: data ?? null };
+    if (!data) return { contrato: null };
+    return {
+      contrato: {
+        id: data.id,
+        modelo: data.modelo,
+        valor_fixo_cents: data.valor_fixo_cents,
+        percentual_exito: data.percentual_exito,
+      },
+    };
   },
 };
 

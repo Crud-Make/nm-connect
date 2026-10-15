@@ -263,6 +263,19 @@ export interface RunModelCallInput {
   /** Cancelamento propagado pelo chamador; a falha continua registrada em llm_calls. */
   abortSignal?: AbortSignal;
   /**
+   * Teto de cada ETAPA do loop (`timeout.stepMs` do AI SDK): a ida ao modelo,
+   * com as re-tentativas do SDK, mais as tools daquela etapa. Estourado, a
+   * etapa é abortada (o sinal chega ao `fetch` do provider) e a chamada FALHA
+   * pelo caminho de sempre — linha em `llm_calls` e erro relançado.
+   *
+   * Por etapa, e não pelo loop inteiro: um turno saudável de várias etapas
+   * (tools, pausas humanas antes do envio) pode somar mais que uma etapa
+   * pendurada, e um teto total o mataria junto. Sem ele, NADA limita a espera:
+   * nem o `fetch` contido do provider nem o SDK têm prazo próprio, e o turno
+   * ficava preso até o `QUEUE_VISIBILITY_TIMEOUT_MS` (600 s) da fila.
+   */
+  tetoPorEtapaMs?: number;
+  /**
    * Override de provider/credencial vindo da versão PUBLICADA do agente (Fase
    * 2B) — resolvido no seam, nunca no call site. Sem ele, config da org.
    */
@@ -886,6 +899,7 @@ export async function runModelCall(db: pg.Pool, cfg: LlmEdgeConfig, input: RunMo
       system: prefix.system,
       messages: input.messages,
       abortSignal: input.abortSignal,
+      ...(input.tetoPorEtapaMs !== undefined ? { timeout: { stepMs: input.tetoPorEtapaMs } } : {}),
       tools: guardServiceTools(prefix.tools),
       stopWhen:
         input.maxSteps === undefined
