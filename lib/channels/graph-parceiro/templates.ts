@@ -15,6 +15,7 @@ import type {
   ChannelTenantScope,
 } from "../types";
 import { graphPartnerGraphBase, resolveGraphPartnerCreds } from "./credentials";
+import { GRAPH_TIMEOUT_GESTAO_MS } from "../meta/erros-da-graph";
 
 /** A forma que a Graph devolve. */
 interface RawTemplate {
@@ -98,7 +99,10 @@ async function varrerModelos(
   let url: string | null = `${graphPartnerGraphBase()}/${encodeURIComponent(c.wabaId)}/message_templates?limit=100&fields=${fields}${filtro}`;
 
   for (let pagina = 0; pagina < 50 && url; pagina += 1) {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${c.token}` } });
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${c.token}` },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_GESTAO_MS),
+    });
     const json = (await res.json().catch(() => null)) as
       | (RawTemplate & { data?: RawTemplate[]; paging?: { next?: string } })
       | null;
@@ -213,6 +217,7 @@ export const graphPartnerTemplateOps: ChannelTemplateOps = {
     const res = await fetch(url, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${c.token}` },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_GESTAO_MS),
     });
     if (!res.ok) throw erroDaGraph(res, await lerJson(res), "failed");
   },
@@ -234,6 +239,7 @@ async function postar(
     method: "POST",
     headers: { Authorization: `Bearer ${c.token}`, "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(GRAPH_TIMEOUT_GESTAO_MS),
   });
   const json = await lerJson(res);
   if (!res.ok || json?.error) throw erroDaGraph(res, json, "failed");

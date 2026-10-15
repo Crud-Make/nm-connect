@@ -68,6 +68,16 @@ export function explainSendResult(r: SendTemplateResult): ToolOutcome {
           "turno; um humano precisa resolver a aprovação.",
         retriable: false,
       };
+    case "timeout":
+      return {
+        ok: false,
+        // NÃO é "tente de novo": a plataforma pode ter recebido o pedido e só a
+        // resposta ter se perdido. Reenviar arriscaria o cliente receber duas vezes.
+        message:
+          "o canal não respondeu a tempo e não dá para saber se o template saiu. " +
+          "Não envie de novo. Encerre o turno; um humano confere na conversa.",
+        retriable: false,
+      };
     case "api_error":
       return {
         ok: false,
