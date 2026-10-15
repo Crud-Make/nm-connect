@@ -201,12 +201,12 @@ const avisosAbertos = () =>
   ops.filter((o) => o.tabela === "agent_inbox_items" && o.op === "insert").map((o) => o.valores);
 
 describe("cron webhook-replay", () => {
-  it("só lê linhas `transitoria:` de WAHA em `error`, mais velhas que a espera", async () => {
+  it("só lê linhas `transitoria:` dos canais com replay (WAHA incluso) em `error`, mais velhas que a espera", async () => {
     await replay();
     const leitura = ops.find((o) => o.tabela === "webhook_events_log" && o.op === "select");
     expect(leitura?.filtros).toEqual(
       expect.arrayContaining([
-        ["eq:provider", "waha"],
+        ["in:provider", expect.arrayContaining(["waha"])],
         ["eq:status", "error"],
         ["like:error_message", "transitoria:%"],
         ["lt:received_at", expect.any(String)],

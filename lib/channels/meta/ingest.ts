@@ -50,7 +50,12 @@ type Admin = SupabaseClient;
 
 export type IngestOutcome =
   | { status: "ingested"; messageId: string; conversationId: string }
-  | { status: "duplicate" }
+  /**
+   * A mesma `wamid` já entrou (23505). `efeitos` diz o que a reentrega fez com
+   * os efeitos pós-entrada daquela mensagem — ver `retomarEfeitosDaReentrega`.
+   * Ausente no eco do app, que não tem efeito pós-entrada para retomar.
+   */
+  | { status: "duplicate"; efeitos?: EfeitosDaReentrega }
   | { status: "no_session" }
   /**
    * Recusa DELIBERADA, e por isso um status próprio.
@@ -76,6 +81,139 @@ export type IngestOutcome =
    */
   | { status: "synced"; contactId: string }
   | { status: "failed"; reason: string };
+
+/**
+ * O que a reentrega fez com os efeitos pós-entrada da mensagem que já existia:
+ *
+ *   - `ja_aplicados` — o despacho do agente daquela mensagem já está no
+ *     `event_log`. Nada roda de novo;
+ *   - `retomados` — não estava, e a mensagem já tem idade: a 1ª entrega morreu
+ *     entre o INSERT e os efeitos. Rodaram agora, uma vez;
+ *   - `em_andamento` — não estava, mas a mensagem é de AGORA: a 1ª entrega pode
+ *     estar no meio dos efeitos (a Meta reentrega quando a resposta demora). A
+ *     ingestão não corre com ela; quem chama marca o arquivo para o replay
+ *     conferir de novo depois da espera.
+ *   - `nao_conferidos` — a própria consulta falhou. Mesmo tratamento do
+ *     anterior: o replay confere quando o banco voltar.
+ */
+export type EfeitosDaReentrega = "ja_aplicados" | "retomados" | "em_andamento" | "nao_conferidos";
+
+/**
+ * Abaixo disto a mensagem pode estar sendo processada pela 1ª entrega. O
+ * replay do arquivo só relê depois de `ESPERA_MS` (2 min), então quem cai aqui
+ * é conferido de novo já fora da janela.
+ */
+export const JANELA_DA_PRIMEIRA_ENTREGA_MS = 60_000;
+
+/**
+ * A reentrega acorda o agente que a 1ª entrega não acordou.
+ *
+ * O defeito: a 1ª entrega grava a mensagem e o processo morre (timeout, OOM,
+ * deploy) antes de `aplicarEfeitosPosEntrada`. A Meta, sem 2xx, reentrega; o
+ * INSERT dá 23505 e a ingestão saía com `duplicate` — os efeitos (negócio,
+ * despacho do agente) nunca rodavam para aquela mensagem, sem erro nem log.
+ *
+ * O sinal de "os efeitos rodaram" é o `ai_agent.dispatch_requested` daquela
+ * mensagem em `event_log` (`entity_kind = 'message'`, `entity_id` = o id dela),
+ * que é o último passo de `aplicarEfeitosPosEntrada`. `emit_event` não tem
+ * chave de idempotência, então a guarda é esta leitura — e os passos de antes
+ * do despacho já são idempotentes (opt-out regrava, o lead é um por contato, a
+ * campanha só autoriza quem não está autorizado).
+ *
+ * Quando o despacho é pulado DE PROPÓSITO (canal desativado, contato pessoal
+ * ou do número interno), o evento nunca existe e cada reentrega roda os efeitos
+ * de novo — que são idempotentes e chegam ao mesmo "pulado".
+ *
+ * O carimbo da conversa só é dado se a 1ª entrega não o deu
+ * (`last_inbound_at` anterior à mensagem): ele soma 1 em não lidas, e não é
+ * idempotente.
+ */
+async function retomarEfeitosDaReentrega(
+  admin: Admin,
+  orgId: string,
+  e: InboundMessageEvent,
+): Promise<EfeitosDaReentrega> {
+  try {
+    const { data: msg, error: erroMsg } = await admin
+      .from("messages")
+      .select("id, contact_id, conversation_id, channel_session_id, body, sent_at, created_at")
+      .eq("organization_id", orgId)
+      .eq("external_id", e.externalId)
+      .eq("direction", "inbound")
+      .maybeSingle();
+    if (erroMsg) throw new Error(`mensagem: ${erroMsg.message}`);
+    const m = msg as {
+      id: string;
+      contact_id: string | null;
+      conversation_id: string | null;
+      channel_session_id: string;
+      body: string | null;
+      sent_at: string | null;
+      created_at: string;
+    } | null;
+    // Sem a linha (ou sem contato/conversa) não há o que despachar.
+    if (!m || !m.contact_id || !m.conversation_id) return "ja_aplicados";
+
+    const { data: despacho, error: erroDespacho } = await admin
+      .from("event_log")
+      .select("id")
+      .eq("organization_id", orgId)
+      .eq("event_type", "ai_agent.dispatch_requested")
+      .eq("entity_kind", "message")
+      .eq("entity_id", m.id)
+      .limit(1)
+      .maybeSingle();
+    if (erroDespacho) throw new Error(`event_log: ${erroDespacho.message}`);
+    if (despacho) return "ja_aplicados";
+
+    if (Date.now() - new Date(m.created_at).getTime() < JANELA_DA_PRIMEIRA_ENTREGA_MS) {
+      return "em_andamento";
+    }
+
+    const instante = m.sent_at ?? e.sentAt.toISOString();
+    const { data: conversa } = await admin
+      .from("conversations")
+      .select("last_inbound_at")
+      .eq("organization_id", orgId)
+      .eq("id", m.conversation_id)
+      .maybeSingle();
+    const ultima = (conversa as { last_inbound_at: string | null } | null)?.last_inbound_at ?? null;
+    if (!ultima || new Date(ultima).getTime() < new Date(instante).getTime()) {
+      await marcarConversaComMensagem(admin, {
+        organizationId: orgId,
+        conversationId: m.conversation_id,
+        direction: "inbound",
+        preview: previewOf(e),
+        at: instante,
+        canal: "meta",
+      });
+    }
+
+    logger.info("[meta.ingest] reentrega retoma os efeitos que a 1ª entrega não aplicou", {
+      organization_id: orgId,
+      message_id: m.id,
+      external_id: e.externalId,
+    });
+    await aplicarEfeitosPosEntrada(admin, {
+      organizationId: orgId,
+      contactId: m.contact_id,
+      conversationId: m.conversation_id,
+      messageId: m.id,
+      channelSessionId: m.channel_session_id,
+      texto: m.body ?? e.text ?? null,
+      nomeDoContato: e.profileName ?? null,
+      origem: "meta_webhook",
+    });
+    return "retomados";
+  } catch (err) {
+    logger.warn("[meta.ingest] reentrega não conferiu os efeitos da mensagem", {
+      organization_id: orgId,
+      external_id: e.externalId,
+      detail: err instanceof Error ? err.message.slice(0, 160) : "desconhecido",
+    });
+    return "nao_conferidos";
+  }
+}
 
 /**
  * Sessão dona do número que RECEBEU, **dentro da organização do token**.
@@ -277,9 +415,13 @@ export async function ingestMetaInbound(
     .select("id")
     .maybeSingle();
 
-  // 23505 = a mesma `external_id` já entrou. Não é erro: é a Meta re-entregando.
+  // 23505 = a mesma `external_id` já entrou. Não é erro: é a Meta re-entregando
+  // — às vezes porque a 1ª entrega morreu ANTES dos efeitos, e por isso a
+  // reentrega confere se o agente foi acordado (`retomarEfeitosDaReentrega`).
   if (erroInsert) {
-    if (erroInsert.code === "23505") return { status: "duplicate" };
+    if (erroInsert.code === "23505") {
+      return { status: "duplicate", efeitos: await retomarEfeitosDaReentrega(admin, orgId, e) };
+    }
     return { status: "failed", reason: `mensagem: ${erroInsert.message}` };
   }
 
@@ -313,10 +455,11 @@ export async function ingestMetaInbound(
       p_organization_id: orgId,
     } as never);
     if (erroPersistencia) {
-      console.error(
-        "[meta.ingest] emit media.persist_requested failed",
-        erroPersistencia.message,
-      );
+      logger.error("[meta.ingest] emit media.persist_requested failed", {
+        organization_id: orgId,
+        message_id: messageId,
+        detail: erroPersistencia.message,
+      });
     }
   }
   await aplicarEfeitosPosEntrada(admin, {

@@ -11,6 +11,8 @@
  * próxima rota copiaria o padrão. Mover a query para cá custa 20 linhas e mantém a
  * regra valendo de verdade — a rota vira transporte puro e não sabe com quem fala.
  */
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ARCHIVED_AT, queryTolerantToMissingArchived } from "../archived";
 import { CHANNEL_PROVIDER_META } from "../capabilities";
@@ -19,6 +21,12 @@ export interface MetaWebhookSession {
   id: string;
   organizationId: string;
   wabaId: string | null;
+  /**
+   * O valor de `channel_sessions.provider` desta sessão. Existe para a rota
+   * gravar o arquivo do webhook (`webhook_events_log.provider`) sem nomear o
+   * canal num literal — o `lint:channels` reprova quem tenta.
+   */
+  provider: string;
 }
 
 /**
@@ -75,6 +83,48 @@ export async function metaSessionByWebhookToken(
     id: data.id,
     organizationId: data.organization_id,
     wabaId: data.meta_waba_id ?? null,
+    provider: CHANNEL_PROVIDER_META,
+  };
+}
+
+/**
+ * A sessão dona de uma linha do ARQUIVO de webhook, para o cron `webhook-replay`.
+ *
+ * O par `(id, organization_id)` vem da linha que a rota gravou — e a rota o
+ * tirou do TOKEN do path, nunca do corpo. Por isso a busca filtra os dois: uma
+ * linha não consegue apontar para a sessão de outra organização.
+ *
+ * Arquivada conta como inexistente, pela mesma razão de
+ * `metaSessionByWebhookToken`: o operador excluiu o canal, e reprocessar o
+ * evento ressuscitaria contato e conversa num inbox que ele já não opera.
+ *
+ * **LANÇA quando a consulta falha** — "não achei" (o cron desiste da linha) e
+ * "não consegui perguntar" (o banco ainda não voltou; o cron tenta de novo)
+ * pedem desfechos opostos.
+ */
+export async function metaSessaoDoArquivo(
+  admin: SupabaseClient,
+  linha: { channelSessionId: string; organizationId: string },
+): Promise<MetaWebhookSession | null> {
+  const base = () =>
+    admin
+      .from("channel_sessions")
+      .select("id, organization_id, meta_waba_id")
+      .eq("id", linha.channelSessionId)
+      .eq("organization_id", linha.organizationId)
+      .eq("provider", CHANNEL_PROVIDER_META);
+  const { data, error } = await queryTolerantToMissingArchived(
+    () => base().is(ARCHIVED_AT, null).maybeSingle(),
+    () => base().maybeSingle(),
+  );
+  if (error) throw new Error(`sessao_do_arquivo: ${error.code ?? "sem_codigo"} ${error.message ?? ""}`.trim());
+  if (!data) return null;
+  const row = data as { id: string; organization_id: string; meta_waba_id: string | null };
+  return {
+    id: row.id,
+    organizationId: row.organization_id,
+    wabaId: row.meta_waba_id ?? null,
+    provider: CHANNEL_PROVIDER_META,
   };
 }
 
@@ -114,6 +164,7 @@ export async function metaSessionForOrg(
     id: data.id,
     organizationId: data.organization_id,
     wabaId: data.meta_waba_id ?? null,
+    provider: CHANNEL_PROVIDER_META,
     phoneNumberId: data.meta_phone_number_id ?? null,
   };
 }
