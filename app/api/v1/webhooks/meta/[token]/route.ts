@@ -33,7 +33,7 @@ import { fail } from "@/lib/api/wrappers";
 import { appDaMeta } from "@/lib/channels/meta/app";
 import { lerEnvelopeMeta } from "@/lib/channels/meta/envelope";
 import { parseMetaWebhook, verificationChallenge, verifyMetaSignature } from "@/lib/channels/meta/webhook";
-import { statusUpdate } from "@/lib/channels/meta/status-update";
+import { carimbosDeEntrega, soSeMaisAntigo, statusUpdate } from "@/lib/channels/meta/status-update";
 import { ingestMetaAppContactSync, ingestMetaEcho, ingestMetaInbound } from "@/lib/channels/meta/ingest";
 import { metaSessionByWebhookToken } from "@/lib/channels/meta/session";
 import { logger } from "@/lib/logger";
@@ -252,11 +252,31 @@ export async function POST(req: NextRequest, ctx: RouteCtx): Promise<NextRespons
       // O evento inteiro vira colunas, não só `status`: quando a Meta ACEITA o
       // template e reprova a entrega depois, o motivo só existe aqui. Ver
       // `lib/channels/meta/status-update.ts`.
+      //
+      // `.neq("status", "failed")` em TODO update deste ramo: a Meta entrega
+      // fora de ordem e reentrega, e um `delivered` que chega depois do
+      // `failed` reabria a mensagem como enviada. Falha é terminal aqui — e o
+      // "uma vez" da emissão acima continua valendo, porque este ramo nunca
+      // tira a linha de `failed`.
       await admin
         .from("messages")
         .update(statusUpdate(e, now))
         .eq("organization_id", session.organizationId)
-        .eq("external_id", e.externalId);
+        .eq("external_id", e.externalId)
+        .neq("status", "failed");
+      // Um update por carimbo, porque cada um tem a sua condição: só grava se a
+      // coluna está nula ou guarda instante POSTERIOR ao do evento. Reentrega
+      // não move o carimbo; `delivered` atrasado depois de `read` o corrige
+      // para trás.
+      for (const c of carimbosDeEntrega(e, now)) {
+        await admin
+          .from("messages")
+          .update({ [c.coluna]: c.em })
+          .eq("organization_id", session.organizationId)
+          .eq("external_id", e.externalId)
+          .neq("status", "failed")
+          .or(soSeMaisAntigo(c));
+      }
     }
   }
 
