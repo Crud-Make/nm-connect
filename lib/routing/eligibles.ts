@@ -12,7 +12,8 @@
 import type { Json } from "@/lib/database.types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { isAttendantEligible, OPEN_LOAD_STATUSES } from "./eligibility";
+import { carregarCargaERodizio } from "./carga";
+import { isAttendantEligible } from "./eligibility";
 import type { RoutingCandidate } from "./decide";
 import { availabilityScheduleSchema } from "@/lib/schemas/routing";
 
@@ -63,44 +64,19 @@ export async function loadEligibleAttendants(
 
   const userIds = rows.map((r) => r.user_id);
 
-  // Carga atual: conversas abertas atribuídas, contadas por dono (1 query).
-  const { data: openConvs, error: loadError } = await supabase
-    .from("conversations")
-    .select("assigned_to_user_id")
-    .eq("organization_id", organizationId)
-    .in("assigned_to_user_id", userIds)
-    .in("status", OPEN_LOAD_STATUSES as unknown as string[]);
-  if (loadError) throw new Error(loadError.message);
-  const loadByUser = new Map<string, number>();
-  for (const c of (openConvs ?? []) as Array<{ assigned_to_user_id: string | null }>) {
-    if (c.assigned_to_user_id) {
-      loadByUser.set(c.assigned_to_user_id, (loadByUser.get(c.assigned_to_user_id) ?? 0) + 1);
-    }
-  }
-
-  // Última atribuição recebida (rodízio real, sem coluna de estado).
-  let history = supabase
-    .from("conversation_assignment_events")
-    .select("to_user_id, created_at, conversations!inner(organization_id, channel_session_id)")
-    .eq("organization_id", organizationId)
-    .in("to_user_id", userIds)
-    .order("created_at", { ascending: false });
-  if (scope.kind === "conversation_channel") {
-    history = history.eq("conversations.organization_id", organizationId)
-      .eq("conversations.channel_session_id", scope.channelSessionId);
-  }
-  const { data: assignEvents, error: historyError } = await history;
-  if (historyError) throw new Error(historyError.message);
-  const lastAssignedByUser = new Map<string, number>();
-  for (const e of (assignEvents ?? []) as Array<{ to_user_id: string | null; created_at: string }>) {
-    if (e.to_user_id && !lastAssignedByUser.has(e.to_user_id)) {
-      lastAssignedByUser.set(e.to_user_id, new Date(e.created_at).getTime());
-    }
-  }
+  // Carga atual e última atribuição recebida (rodízio real, sem coluna de
+  // estado), contadas no banco: ler as linhas esbarrava no corte de 1000 do
+  // PostgREST e subcontava em silêncio (lib/routing/carga.ts).
+  const cargas = await carregarCargaERodizio(
+    supabase,
+    organizationId,
+    userIds,
+    scope.kind === "conversation_channel" ? scope.channelSessionId : null,
+  );
 
   const candidates: RoutingCandidate[] = [];
   for (const r of rows) {
-    const currentLoad = loadByUser.get(r.user_id) ?? 0;
+    const currentLoad = cargas.get(r.user_id)?.carga ?? 0;
     const schedule = availabilityScheduleSchema.parse(r.schedule ?? {});
     const eligible = isAttendantEligible(
       { isAvailable: true, capacity: r.capacity, currentLoad, schedule },
@@ -111,7 +87,7 @@ export async function loadEligibleAttendants(
         userId: r.user_id,
         currentLoad,
         scheduleSnapshot: r.schedule as Json,
-        lastAssignedAt: lastAssignedByUser.get(r.user_id) ?? null,
+        lastAssignedAt: cargas.get(r.user_id)?.ultimaAtribuicaoEm ?? null,
       });
     }
   }

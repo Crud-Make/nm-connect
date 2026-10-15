@@ -158,7 +158,10 @@ export function routingPgSupabase(pool: pg.Pool) {
         const entries = Object.entries(args);
         const result = await pool.query(
           `select ${identifier(name)}(${entries.map(([k], i) => `${identifier(k)}=>$${i + 1}`).join(",")}) r`,
-          entries.map(([, v]) => (typeof v === "object" && v !== null ? JSON.stringify(v) : v)),
+          // Array vai como array do Postgres (uuid[]/text[]); só objeto vira jsonb.
+          entries.map(([, v]) =>
+            typeof v === "object" && v !== null && !Array.isArray(v) ? JSON.stringify(v) : v,
+          ),
         );
         return { data: result.rows[0]?.r, error: null };
       } catch (error) {

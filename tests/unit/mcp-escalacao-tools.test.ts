@@ -74,7 +74,22 @@ function fazerSupabase(resolve: Resolver) {
   };
   return {
     from,
-    rpc: () => Promise.resolve({ data: [{ id: CONV }], error: null }),
+    rpc: (fn: string, args?: { p_user_ids?: string[] }) => {
+      // A carga contada no banco (lib/routing/carga.ts): o dublê conta as linhas
+      // que o resolver daria para `conversations`, por dono.
+      if (fn === "fn_carga_e_rodizio_dos_atendentes") {
+        const linhas = (resolve({ tabela: "conversations", terminal: "then" }).data ?? []) as Array<{
+          assigned_to_user_id?: string | null;
+        }>;
+        const data = (args?.p_user_ids ?? []).map((user_id) => ({
+          user_id,
+          carga: linhas.filter((c) => c.assigned_to_user_id === user_id).length,
+          ultima_atribuicao_em: null,
+        }));
+        return Promise.resolve({ data, error: null });
+      }
+      return Promise.resolve({ data: [{ id: CONV }], error: null });
+    },
     // O lookup de NOME (issue #1539) fala com o endpoint admin do GoTrue. O
     // dublê responde com o full_name de `NOMES_DE_USUARIO` — é isso que faz o
     // `nome` da linha ser aferível, e não um null silencioso do catch.
