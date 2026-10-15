@@ -64,28 +64,59 @@ $$;
 -- Tabelas
 -- ===========================================================================
 
-create table if not exists escritorio.clientes (
+/*
+ * PESSOAS são quem fala no WhatsApp. CLIENTES são quem contrata: pessoa física
+ * ou empresa. Na PF, a pessoa é a titular do próprio cliente; na PJ, sócio,
+ * contador ou financeiro são pessoas AUTORIZADAS pela empresa. A conferência
+ * do CPF é sempre de quem fala.
+ */
+create table if not exists escritorio.pessoas (
   id uuid primary key default gen_random_uuid(),
   nome text not null,
   /* E.164, com o +DDI. Obrigatório: é a primeira barreira da consulta. */
   telefone_whatsapp text not null
-    constraint clientes_telefone_e164 check (telefone_whatsapp ~ '^\+[1-9][0-9]{9,14}$'),
+    constraint pessoas_telefone_e164 check (telefone_whatsapp ~ '^\+[1-9][0-9]{9,14}$'),
   /*
    * Os 3 ÚLTIMOS dígitos do CPF, e só eles: a conferência não precisa de mais,
    * e o que não está aqui não vaza. Nunca o CPF inteiro.
    */
   cpf_confere text not null
-    constraint clientes_cpf_confere_3_digitos check (cpf_confere ~ '^[0-9]{3}$'),
+    constraint pessoas_cpf_confere_3_digitos check (cpf_confere ~ '^[0-9]{3}$'),
   criado_em timestamptz not null default now(),
   atualizado_em timestamptz not null default now()
 );
 
 /*
- * Um telefone, um cliente — inclusive entre as grafias com e sem o nono
+ * Um telefone, uma pessoa — inclusive entre as grafias com e sem o nono
  * dígito. Com dois donos, o mesmo WhatsApp veria os processos dos dois.
  */
-create unique index if not exists clientes_telefone_unico
-  on escritorio.clientes (escritorio.telefone_canonico(telefone_whatsapp));
+create unique index if not exists pessoas_telefone_unico
+  on escritorio.pessoas (escritorio.telefone_canonico(telefone_whatsapp));
+
+create table if not exists escritorio.clientes (
+  id uuid primary key default gen_random_uuid(),
+  tipo text not null
+    constraint clientes_tipo_valido check (tipo in ('PF', 'PJ')),
+  /* Nome da pessoa (PF) ou razão social (PJ). */
+  nome text not null,
+  /* Só na PJ, 14 dígitos sem máscara. Dado público da empresa. */
+  cnpj text unique
+    constraint clientes_cnpj_formato check (cnpj ~ '^[0-9]{14}$'),
+  constraint clientes_cnpj_so_na_pj check ((tipo = 'PJ') = (cnpj is not null)),
+  criado_em timestamptz not null default now(),
+  atualizado_em timestamptz not null default now()
+);
+
+/* Quem fala em nome de cada cliente, e em que papel. */
+create table if not exists escritorio.cliente_pessoas (
+  cliente_id uuid not null references escritorio.clientes (id) on delete cascade,
+  pessoa_id uuid not null references escritorio.pessoas (id) on delete cascade,
+  papel text not null
+    constraint cliente_pessoas_papel_valido
+    check (papel in ('titular', 'socio', 'representante', 'contador', 'financeiro')),
+  primary key (cliente_id, pessoa_id)
+);
+create index if not exists cliente_pessoas_pessoa on escritorio.cliente_pessoas (pessoa_id);
 
 create table if not exists escritorio.processos (
   id uuid primary key default gen_random_uuid(),
@@ -126,6 +157,30 @@ create table if not exists escritorio.andamentos (
 create index if not exists andamentos_processo_data on escritorio.andamentos (processo_id, data desc);
 
 /*
+ * O dossiê do cliente: RG, CNIS, procuração, contrato de honorários, petições.
+ * O arquivo mora num bucket PRIVADO do Storage deste projeto; aqui fica o
+ * ponteiro. O processo é opcional, mas quando vem tem de ser do mesmo cliente
+ * (a FK composta com `cliente_processo` garante). A IA não enxerga esta tabela.
+ */
+create table if not exists escritorio.documentos (
+  id uuid primary key default gen_random_uuid(),
+  cliente_id uuid not null references escritorio.clientes (id) on delete cascade,
+  processo_id uuid,
+  /* Vocabulário aberto de propósito: "rg", "cnis", "procuracao", "contrato_honorarios"... */
+  tipo text not null,
+  nome_arquivo text not null,
+  caminho_storage text not null unique,
+  origem text not null
+    constraint documentos_origem_valida check (origem in ('whatsapp', 'equipe', 'email', 'tribunal')),
+  enviado_por text,
+  criado_em timestamptz not null default now(),
+  constraint documentos_processo_do_cliente
+    foreign key (cliente_id, processo_id)
+    references escritorio.cliente_processo (cliente_id, processo_id) on delete cascade
+);
+create index if not exists documentos_cliente on escritorio.documentos (cliente_id, criado_em desc);
+
+/*
  * Texto mudou depois de liberado → volta para revisão. O advogado aprovou
  * AQUELE texto, não o que veio depois. Só continua liberado quando o mesmo
  * update traz revisão nova (revisado_em diferente).
@@ -155,13 +210,18 @@ create trigger andamento_volta_para_revisao
 -- ===========================================================================
 
 /*
- * Um processo por linha, repetido para cada grafia do telefone do cliente: o
- * conector filtra `telefone in (+55..., 55..., ...)` com o número da conversa,
- * e a linha casa com ou sem o nono dígito. Só o último andamento LIBERADO.
+ * Um processo por linha, repetido para cada grafia do telefone de cada pessoa
+ * que fala pelo cliente: o conector filtra `telefone in (+55..., 55..., ...)`
+ * com o número da conversa, e a linha casa com ou sem o nono dígito. Só o
+ * último andamento LIBERADO. `cliente` e `papel` deixam a IA dizer "o processo
+ * da Empresa XYZ" quando quem fala é o contador.
  */
 create or replace view ia.processos as
 select
   t.telefone,
+  c.nome as cliente,
+  c.tipo as tipo_cliente,
+  cpe.papel,
   p.apelido,
   p.numero_cnj,
   p.area,
@@ -170,10 +230,12 @@ select
   ua.data as data_ultimo_andamento,
   ua.texto_para_cliente as ultimo_andamento,
   ua.proximo_passo
-from escritorio.clientes c
+from escritorio.pessoas pe
+join escritorio.cliente_pessoas cpe on cpe.pessoa_id = pe.id
+join escritorio.clientes c on c.id = cpe.cliente_id
 join escritorio.cliente_processo cp on cp.cliente_id = c.id
 join escritorio.processos p on p.id = cp.processo_id
-cross join lateral unnest(escritorio.variantes_do_telefone(c.telefone_whatsapp)) as t (telefone)
+cross join lateral unnest(escritorio.variantes_do_telefone(pe.telefone_whatsapp)) as t (telefone)
 left join lateral (
   select a.data, a.texto_para_cliente, a.proximo_passo
   from escritorio.andamentos a
@@ -186,21 +248,25 @@ left join lateral (
 create or replace view ia.andamentos as
 select
   t.telefone,
+  c.nome as cliente,
   p.apelido,
   p.numero_cnj,
   a.data,
   a.texto_para_cliente,
   a.proximo_passo
-from escritorio.clientes c
+from escritorio.pessoas pe
+join escritorio.cliente_pessoas cpe on cpe.pessoa_id = pe.id
+join escritorio.clientes c on c.id = cpe.cliente_id
 join escritorio.cliente_processo cp on cp.cliente_id = c.id
 join escritorio.processos p on p.id = cp.processo_id
 join escritorio.andamentos a on a.processo_id = p.id and a.liberado_para_cliente
-cross join lateral unnest(escritorio.variantes_do_telefone(c.telefone_whatsapp)) as t (telefone);
+cross join lateral unnest(escritorio.variantes_do_telefone(pe.telefone_whatsapp)) as t (telefone);
 
 /*
- * A conferência do CPF. Devolve só sim ou não, e só para o dono do telefone:
- * o CPF nunca sai do banco, nem para o NM Connect. `security definer` porque o
- * `crm_leitor` não lê `escritorio.clientes`. O limite de tentativas fica no
+ * A conferência do CPF de QUEM FALA (na PJ, o da pessoa autorizada, não o da
+ * empresa). Devolve só sim ou não, e só para o dono do telefone: o CPF nunca
+ * sai do banco, nem para o NM Connect. `security definer` porque o
+ * `crm_leitor` não lê `escritorio.pessoas`. O limite de tentativas fica no
  * NM Connect, que conta por conversa (este banco é só leitura para ele).
  */
 create or replace function ia.conferir_cpf(p_telefone text, p_digitos text)
@@ -212,9 +278,9 @@ set search_path = ''
 as $$
   select coalesce(p_digitos ~ '^[0-9]{3}$', false)
      and exists (
-       select 1 from escritorio.clientes c
-       where escritorio.telefone_canonico(c.telefone_whatsapp) = escritorio.telefone_canonico(p_telefone)
-         and c.cpf_confere = p_digitos
+       select 1 from escritorio.pessoas pe
+       where escritorio.telefone_canonico(pe.telefone_whatsapp) = escritorio.telefone_canonico(p_telefone)
+         and pe.cpf_confere = p_digitos
      )
 $$;
 

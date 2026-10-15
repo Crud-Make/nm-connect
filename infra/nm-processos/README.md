@@ -1,19 +1,22 @@
 # Banco de processos do escritório
 
-Supabase **separado** do NM Connect. Guarda clientes, processos e andamentos revisados. O NM Connect só lê este banco, pelo conector de banco externo, e só enxerga o schema `ia`. Desenho completo e decisões na issue #18.
+Supabase **separado** do NM Connect. É o dossiê do escritório: pessoas, clientes (PF e PJ), processos, andamentos revisados e documentos. O NM Connect só lê este banco, pelo conector de banco externo, e só enxerga o schema `ia`. Desenho completo e decisões na issue #18.
 
 | Schema | O que tem | Quem alcança |
 |---|---|---|
-| `escritorio` | tabelas reais: `clientes`, `processos`, `cliente_processo`, `andamentos` | só o dono do banco (equipe) |
+| `escritorio` | tabelas reais: `pessoas`, `clientes`, `cliente_pessoas`, `processos`, `cliente_processo`, `andamentos`, `documentos` | só o dono do banco (equipe) |
 | `ia` | views `ia.processos` e `ia.andamentos`, função `ia.conferir_cpf` | papel `crm_leitor` (NM Connect) |
 
 Regras que o banco garante (testadas em `teste.sql`):
 
-- **Telefone obrigatório** em E.164 e **único por cliente**, inclusive escrito com e sem o nono dígito.
-- **Só os 3 últimos dígitos do CPF** (`cpf_confere`). O CPF inteiro é recusado.
+- **Pessoa é quem fala no WhatsApp; cliente é quem contrata** (PF ou PJ). Na PF, a pessoa é `titular`. Na PJ, sócio, representante, contador ou financeiro são pessoas autorizadas, e todas veem os processos da empresa.
+- **Telefone obrigatório** em E.164 e **único por pessoa**, inclusive escrito com e sem o nono dígito.
+- **Só os 3 últimos dígitos do CPF de quem fala** (`pessoas.cpf_confere`). O CPF inteiro é recusado. Na PJ confere o CPF da pessoa autorizada, não o CNPJ.
+- **CNPJ só na PJ**, com 14 dígitos e sem repetição.
+- **Documentos** (RG, CNIS, procuração, contrato…) ficam num bucket privado; a tabela guarda o ponteiro. Documento ligado a processo tem de ser processo do mesmo cliente. A IA não enxerga documentos.
 - **Andamento liberado exige revisor e data de revisão.** Se o texto mudar depois de liberado, ele volta para revisão sozinho.
 - **As views mostram só andamentos liberados.** Cada processo aparece nas duas grafias do telefone, para o filtro do conector casar.
-- **O `crm_leitor` não lê as tabelas de `escritorio`**, nem vê coluna de CPF. A conferência do CPF devolve só `true`/`false`, e só para o dono do telefone.
+- **O `crm_leitor` não lê as tabelas de `escritorio`**, nem vê coluna de CPF ou CNPJ. A conferência do CPF devolve só `true`/`false`, e só para o dono do telefone.
 
 ## Testar
 
