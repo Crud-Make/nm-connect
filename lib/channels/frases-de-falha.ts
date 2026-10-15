@@ -35,7 +35,25 @@ const FRASES: Record<string, string> = {
   zernio_error: "O canal recusou o envio. Confira a conexão em Conexões.",
   // Falha do NOSSO Storage ao preparar a mídia — não é do canal.
   storage_sign_failed: "Não conseguimos preparar o arquivo para envio.",
+  // Os dois transportes do dialeto da Cloud API (`meta/erros-da-graph.ts`):
+  // mesma frase, prefixos diferentes na coluna.
+  ...frasesDaGraph("meta"),
+  ...frasesDaGraph("datafy"),
 };
+
+function frasesDaGraph(prefixo: string): Record<string, string> {
+  return {
+    // Tempo esgotado: desfecho DESCONHECIDO. A frase não pode dizer "não saiu".
+    [`${prefixo}_timeout`]:
+      "O WhatsApp não respondeu a tempo e a mensagem pode ter saído. Confira a conversa antes de reenviar — ela não foi reenviada automaticamente.",
+    [`${prefixo}_token_invalido`]:
+      "O token de acesso do WhatsApp foi recusado (vencido ou revogado). Gere um novo token e atualize a conexão em Conexões.",
+    [`${prefixo}_limite_de_envio`]:
+      "O WhatsApp limitou a quantidade de envios deste número agora. A mensagem não saiu; tente de novo em alguns minutos.",
+    [`${prefixo}_limite_do_par`]:
+      "Foram enviadas mensagens demais para este contato em pouco tempo. A mensagem não saiu; espere alguns minutos e tente de novo.",
+  };
+}
 
 /**
  * `null` quando o código não tem tradução — e o `null` é deliberado: quem

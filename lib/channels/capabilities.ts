@@ -176,6 +176,32 @@ export function transportaMensagem(provider: string | null | undefined): boolean
 }
 
 /**
+ * Os canais cujas mensagens automáticas presas em `queued` TÊM quem as reenvie
+ * sozinho: o watchdog do agent-engine (`redriveQueued` em
+ * `lib/agent-engine/edge/crm/session-reconciler.ts`), que fala direto com este
+ * transporte e só com ele — e só liga quando as credenciais dele estão no env.
+ *
+ * Fica FORA da matriz de capabilities de propósito: capability descreve o que a
+ * plataforma permite, e isto descreve o nosso encanamento. Mas mora aqui, na
+ * fronteira, para nenhuma feature precisar escrever o nome de um provider para
+ * perguntar "esta fila tem resgate?".
+ *
+ * `satisfies` pelo mesmo motivo das listas acima: um canal novo cai, por
+ * omissão, em "sem resgate" — que é o lado que torna a falha VISÍVEL (o cron
+ * `recover-stuck-messages` marca e avisa). O lado errado seria um canal novo
+ * fingir que tem quem o reenvie e deixar a mensagem presa em silêncio.
+ */
+export const PROVIDERS_COM_RESGATE_DA_FILA = [
+  "waha",
+] as const satisfies readonly ProviderDeMensagem[];
+
+/** Os canais de mensagem cuja fila (`queued`) ninguém reenvia automaticamente. */
+export function providersSemResgateDaFila(): ProviderDeMensagem[] {
+  const com: readonly string[] = PROVIDERS_COM_RESGATE_DA_FILA;
+  return PROVIDERS_DE_MENSAGEM.filter((p) => !com.includes(p));
+}
+
+/**
  * Os providers que ESTE código conhece e que, sabidamente, não conversam.
  *
  * A diferença para `!transportaMensagem(p)` é a que separa "categoria" de

@@ -72,11 +72,15 @@ describe("sendWithLedger só procura a mensagem no replay", () => {
     expect(send).toHaveBeenCalledWith("ledger-novo", "ledger-novo");
   });
 
-  it("rotate (falha anterior) gera chave nova e também não consulta messages", async () => {
+  it("rotate (falha anterior) gera chave nova; consulta só a chave ANTIGA, pela PK, uma vez", async () => {
+    // A consulta da chave antiga existe para não reabrir uma entrega INCERTA
+    // (`send-ledger-entrega-incerta.test.ts`): é pela PK e só neste ramo de
+    // retry. A chave nova, recém-nascida, continua sem consulta nenhuma.
     const db = store("failed");
     const send = vi.fn(async (_k: string, id: string) => ({ id, status: "sent" }));
     expect((await sendWithLedger(db, intent, send)).kind).toBe("sent");
-    expect(db.message).not.toHaveBeenCalled();
+    expect(db.message).toHaveBeenCalledTimes(1);
+    expect(db.message).toHaveBeenCalledWith("org", "ledger-original");
     expect(send).toHaveBeenCalledWith("ledger-rodado", "ledger-rodado");
   });
 
@@ -104,7 +108,9 @@ describe("store.message busca pela PK e só cai no metadata se a PK não achar",
     expect(await pgSendLedger(db).message("org", "k")).toEqual({ id: "k", status: "sent" });
     expect(db.sqls).toHaveLength(1);
     expect(db.sqls[0]).toMatch(/\bid=\$2/);
-    expect(db.sqls[0]).not.toContain("metadata");
+    // `metadata` pode ser LIDO na linha achada (a marca de entrega incerta); o
+    // que não pode é servir de FILTRO, que é a varredura sem índice.
+    expect(db.sqls[0]!.slice(db.sqls[0]!.search(/\bwhere\b/i))).not.toContain("metadata");
     expect(db.params[0]).toEqual(["org", "k"]);
   });
 
@@ -129,7 +135,7 @@ describe("store.message busca pela PK e só cai no metadata se a PK não achar",
       return q;
     });
     const sb = { from } as unknown as SupabaseClient;
-    expect(await supabaseSendLedger(sb).message("org", "k")).toEqual({ id: "k", status: "sent" });
+    expect(await supabaseSendLedger(sb).message("org", "k")).toEqual({ id: "k", status: "sent", entregaIncerta: false });
     expect(filtros).toEqual([[["organization_id", "org"], ["id", "k"]]]);
   });
 });

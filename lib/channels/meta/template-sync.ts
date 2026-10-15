@@ -17,6 +17,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 import { hashContract } from "./contract-hash";
 import { graphBaseUrl } from "./graph-base";
+import { GRAPH_TIMEOUT_GESTAO_MS } from "./erros-da-graph";
 import { normalizeRejectedReason as rejectedReason } from "./webhook";
 
 /**
@@ -235,7 +236,12 @@ async function fetchAllTemplates(input: SyncInput): Promise<unknown[]> {
 
   for (let page = 0; page < 50; page += 1) {
     const url: string = after ? `${base}&after=${encodeURIComponent(after)}` : base;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${input.token}` } });
+    // Teto de espera (`erros-da-graph.ts`): sem ele uma Graph pendurada prendia
+    // a sincronização — e o cron ou a tela que a chamou — para sempre.
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${input.token}` },
+      signal: AbortSignal.timeout(GRAPH_TIMEOUT_GESTAO_MS),
+    });
     const body: unknown = await res.json();
     if (!res.ok) {
       throw new Error(
