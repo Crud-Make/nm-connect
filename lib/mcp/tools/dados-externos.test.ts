@@ -9,8 +9,13 @@ vi.mock("@/lib/external-db/leitura", async () => {
   const real = (await vi.importActual("@/lib/external-db/leitura")) as Record<string, unknown>;
   return { ...real, lerTabela: vi.fn() };
 });
+vi.mock("@/lib/external-db/conferencia-de-cpf", async () => {
+  const real = (await vi.importActual("@/lib/external-db/conferencia-de-cpf")) as Record<string, unknown>;
+  return { ...real, lerConferencia: vi.fn() };
+});
 
 import { abrirAcesso } from "@/lib/external-db/acesso";
+import { lerConferencia } from "@/lib/external-db/conferencia-de-cpf";
 import { colunasDaTabela, listarTabelas } from "@/lib/external-db/introspeccao";
 import { LeituraInvalidaError, lerTabela, montarConsulta } from "@/lib/external-db/leitura";
 import type { ConexaoExterna, TabelaExterna } from "@/lib/external-db/types";
@@ -32,6 +37,7 @@ const CONEXAO: ConexaoExterna = {
   maxFilters: 20,
   maxResponseBytes: 30_000,
   chaveDoCliente: null,
+  exigeConferenciaDeCpf: false,
   versao: "2026-09-11T00:00:00.000Z",
 };
 
@@ -480,5 +486,102 @@ describe("crm_query_external_data durante a conversa: só as linhas do cliente",
     vi.mocked(abrirAcesso).mockResolvedValue({ ok: true, conexao: COM_CHAVE, pool: {} as never });
     await crmQueryExternalData.handler(PEDIDO, ctxFake());
     expect(vi.mocked(lerTabela).mock.calls[0]![1].filtros).toEqual([]);
+  });
+});
+
+describe("crm_query_external_data com a trava do CPF", () => {
+  const PEDIDO = { connection_id: "conn-1", schema: "public", tabela: "assinaturas", limite: 20 };
+  const TRAVADA: ConexaoExterna = {
+    ...CONEXAO,
+    chaveDoCliente: { coluna: "telefone", tipo: "phone" },
+    exigeConferenciaDeCpf: true,
+  };
+
+  function ctxDoTurno() {
+    const chain = {
+      select: () => chain,
+      eq: () => chain,
+      order: async () => ({ data: [{ id: "conn-1", label: "Outro CRM" }], error: null }),
+      maybeSingle: async () => ({ data: { phone_number: "+5511999998888", email: null }, error: null }),
+    };
+    return { ...ctxFake(), contatoDoTurno: "contato-1", supabase: { from: () => chain } } as unknown as McpContext;
+  }
+
+  beforeEach(() => {
+    vi.mocked(abrirAcesso).mockResolvedValue({ ok: true, conexao: TRAVADA, pool: {} as never });
+    vi.mocked(colunasDaTabela).mockResolvedValue(new Set(["id", "status", "telefone"]));
+    vi.mocked(lerTabela).mockResolvedValue({ colunas: ["id"], linhas: [{ id: 1 }], limite: 20, offset: 0 });
+    vi.mocked(lerConferencia).mockReset().mockResolvedValue(null);
+  });
+
+  it("contato sem conferência: recusa SEM dado nenhum e ensina a pedir os dígitos", async () => {
+    const r = (await crmQueryExternalData.handler(PEDIDO, ctxDoTurno())) as Record<string, unknown>;
+    expect(r.erro).toBe("identidade_nao_conferida");
+    expect(String(r.mensagem)).toContain("3 últimos dígitos do CPF");
+    expect(String(r.mensagem)).toContain("crm_confirm_customer_identity");
+    expect(r.linhas).toBeUndefined();
+    expect(lerTabela).not.toHaveBeenCalled();
+    expect(lerConferencia).toHaveBeenCalledWith(expect.anything(), "org-1", "contato-1", "conn-1");
+  });
+
+  it("conferência válida libera a leitura (com o filtro do cliente de sempre)", async () => {
+    vi.mocked(lerConferencia).mockResolvedValue({
+      verificadoAte: new Date(Date.now() + 60_000),
+      tentativasFalhas: 0,
+      bloqueadoAte: null,
+    });
+    const r = (await crmQueryExternalData.handler(PEDIDO, ctxDoTurno())) as Record<string, unknown>;
+    expect(r.erro).toBeUndefined();
+    expect(r.linhas_devolvidas).toBe(1);
+    expect(vi.mocked(lerTabela).mock.calls[0]![1].filtros).toEqual([
+      { coluna: "telefone", operador: "in", valor: ["+5511999998888", "5511999998888", "11999998888"] },
+    ]);
+  });
+
+  it("conferência vencida: volta a recusar", async () => {
+    vi.mocked(lerConferencia).mockResolvedValue({
+      verificadoAte: new Date(Date.now() - 1),
+      tentativasFalhas: 0,
+      bloqueadoAte: null,
+    });
+    const r = (await crmQueryExternalData.handler(PEDIDO, ctxDoTurno())) as Record<string, unknown>;
+    expect(r.erro).toBe("identidade_nao_conferida");
+    expect(lerTabela).not.toHaveBeenCalled();
+  });
+
+  it("bloqueado por erros: recusa e manda passar para a equipe, sem pedir os dígitos de novo", async () => {
+    vi.mocked(lerConferencia).mockResolvedValue({
+      verificadoAte: null,
+      tentativasFalhas: 3,
+      bloqueadoAte: new Date(Date.now() + 60_000),
+    });
+    const r = (await crmQueryExternalData.handler(PEDIDO, ctxDoTurno())) as Record<string, unknown>;
+    expect(r.erro).toBe("identidade_bloqueada");
+    expect(String(r.mensagem)).toContain("equipe");
+    expect(lerTabela).not.toHaveBeenCalled();
+  });
+
+  it("falha ao ler o estado: recusa (falha fechado)", async () => {
+    vi.mocked(lerConferencia).mockRejectedValue(new Error("db down"));
+    const r = (await crmQueryExternalData.handler(PEDIDO, ctxDoTurno())) as Record<string, unknown>;
+    expect(r.erro).toBe("conferencia_indisponivel");
+    expect(lerTabela).not.toHaveBeenCalled();
+  });
+
+  it("CONTROLE: fora da conversa a trava não se aplica (integrador, pessoa)", async () => {
+    const r = (await crmQueryExternalData.handler(PEDIDO, ctxFake())) as Record<string, unknown>;
+    expect(r.erro).toBeUndefined();
+    expect(lerConferencia).not.toHaveBeenCalled();
+  });
+
+  it("CONTROLE: conexão sem a trava segue como antes na conversa", async () => {
+    vi.mocked(abrirAcesso).mockResolvedValue({
+      ok: true,
+      conexao: { ...TRAVADA, exigeConferenciaDeCpf: false },
+      pool: {} as never,
+    });
+    const r = (await crmQueryExternalData.handler(PEDIDO, ctxDoTurno())) as Record<string, unknown>;
+    expect(r.erro).toBeUndefined();
+    expect(lerConferencia).not.toHaveBeenCalled();
   });
 });

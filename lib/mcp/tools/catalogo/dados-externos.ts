@@ -44,4 +44,18 @@ export const TOOLS_DADOS_EXTERNOS = declararTools([
     pacotes: ["organizar"],
     modulo: "banco_externo",
   },
+  {
+    // A trava do CPF (#18). Entra SOZINHA no turno de quem tem a busca acima
+    // (`pickToolsFromMcp`): sem ela, ligar "exigir conferência de CPF" na
+    // conexão deixaria o assistente sem como liberar a consulta.
+    name: "crm_confirm_customer_identity",
+    category: "write",
+    rotulo: "Conferir o CPF do cliente antes de mostrar dados",
+    explicacao:
+      "Pede ao cliente os três últimos dígitos do CPF e confere no banco conectado antes de mostrar qualquer dado dele. Três erros bloqueiam por um dia e chamam a equipe.",
+    oQueToca: "Conferência de identidade do cliente",
+    risco: "atencao",
+    pacotes: ["organizar"],
+    modulo: "banco_externo",
+  },
 ]);
