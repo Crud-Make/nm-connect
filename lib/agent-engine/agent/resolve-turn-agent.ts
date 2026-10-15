@@ -107,6 +107,11 @@ export interface TurnAgentResolution {
    */
   destinationPipelineId?: string | null;
   destinationStageId?: string | null;
+  /**
+   * Setor do membro casado (0675). Quem decide se ele é GRAVADO na conversa é
+   * `setorParaGravar` (`setor-da-intencao.ts`): só decisão nova com confiança.
+   */
+  setorId?: string | null;
 }
 
 export interface ResolveTurnAgentDeps {
@@ -332,6 +337,7 @@ export async function resolveTurnAgent(
         flowPointerId: outcome === 'sticky' ? null : (member.flowPointerId ?? null),
         destinationPipelineId: member.destinationPipelineId ?? null,
         destinationStageId: member.destinationStageId ?? null,
+        setorId: member.setorId ?? null,
       };
     };
 

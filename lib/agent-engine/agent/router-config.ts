@@ -30,6 +30,12 @@ export interface RouterMember {
    */
   destinationPipelineId?: string | null;
   destinationStageId?: string | null;
+  /**
+   * Setor para onde a intenção leva a conversa (migration 0675). Quando casa
+   * com confiança, o turno grava `conversations.setor_id` e o roteamento
+   * humano só escolhe membros do setor. `null`/ausente = não mexe no setor.
+   */
+  setorId?: string | null;
 }
 
 export interface LoadedRouter {
@@ -77,6 +83,7 @@ interface MemberRow {
   flow_pointer_id: string | null;
   pipeline_id: string | null;
   stage_id: string | null;
+  setor_id?: string | null;
 }
 
 export async function loadActiveRouter(
@@ -96,7 +103,7 @@ export async function loadActiveRouter(
   if (router === undefined) return null;
 
   const { rows: memberRows } = await db.query<MemberRow>(
-    `select agent_id, intent_name, intent_description, examples, flow_pointer_id, pipeline_id, stage_id
+    `select agent_id, intent_name, intent_description, examples, flow_pointer_id, pipeline_id, stage_id, setor_id
      from ai_router_members
      where router_id = $1
        and organization_id = $2
@@ -147,6 +154,7 @@ export async function loadActiveRouter(
       flowPointerId: m.flow_pointer_id,
       destinationPipelineId: m.pipeline_id,
       destinationStageId: m.stage_id,
+      setorId: m.setor_id ?? null,
     })),
   };
 }

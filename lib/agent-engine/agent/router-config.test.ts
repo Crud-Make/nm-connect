@@ -76,3 +76,18 @@ describe('loadActiveRouter — provedor do classificador', () => {
     }
   });
 });
+
+describe('loadActiveRouter — setor da intenção (0675)', () => {
+  it('lê setor_id do membro; ausente vira null', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ rows: [{ id: 'r1', name: 'X', config: {}, fallback_agent_id: null }] })
+      .mockResolvedValueOnce({ rows: [
+        { agent_id: 'a1', intent_name: 'tributario', intent_description: 'Dúvida de imposto', examples: [], setor_id: 'setor-trib' },
+        { agent_id: 'a2', intent_name: 'outros', intent_description: 'Resto', examples: [] },
+      ] });
+    const router = await loadActiveRouter({ query } as unknown as pg.Pool, 'org1', 'cs1');
+    expect(router?.members.map((m) => m.setorId)).toEqual(['setor-trib', null]);
+    // A coluna precisa estar no SELECT — sem ela o mapeamento lê sempre undefined.
+    expect(String(query.mock.calls[1]?.[0])).toContain('setor_id');
+  });
+});

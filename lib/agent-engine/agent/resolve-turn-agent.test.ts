@@ -841,3 +841,30 @@ describe('2155 — destino de funil na intenção casada', () => {
     expect(out.destinationPipelineId ?? null).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 0675 — a intenção casada também diz o SETOR da conversa
+// ---------------------------------------------------------------------------
+describe('0675 — setor na intenção casada', () => {
+  const comSetor = [{ ...members[0]!, setorId: 'setor-vendas' }, members[1]!];
+
+  it('classificou → a resolução carrega o setor do membro casado', async () => {
+    const loadActiveRouter = vi.fn().mockResolvedValue(router({ sticky: false, members: comSetor }));
+    const classifyIntent = vi.fn().mockResolvedValue({ intentName: 'vendas', confidence: 0.9 });
+    const out = await resolveTurnAgent({} as never, {} as never,
+      { ...baseInput, signal: 'quero comprar', stickyAgentId: null, stickyIntent: null },
+      makeDeps({ loadActiveRouter, classifyIntent, loadPublishedAgentConfigById: idAwareLoader() }));
+    expect(out.outcome).toBe('classified');
+    expect(out.setorId).toBe('setor-vendas');
+  });
+
+  it('fallback não herda setor de intenção nenhuma', async () => {
+    const loadActiveRouter = vi.fn().mockResolvedValue(router({ sticky: false, fallbackAgentId: 'agent-reserva', members: comSetor }));
+    const classifyIntent = vi.fn().mockResolvedValue({ intentName: 'inexistente', confidence: 0.99 });
+    const out = await resolveTurnAgent({} as never, {} as never,
+      { ...baseInput, signal: 'oi', stickyAgentId: null, stickyIntent: null },
+      makeDeps({ loadActiveRouter, classifyIntent, loadPublishedAgentConfigById: idAwareLoader() }));
+    expect(out.outcome).toBe('fallback');
+    expect(out.setorId ?? null).toBeNull();
+  });
+});
