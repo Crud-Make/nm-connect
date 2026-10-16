@@ -1,6 +1,6 @@
 <div align="center">
 
-🇧🇷 Português · [🇺🇸 English](README.en.md) · [🇪🇸 Español](README.es.md)
+🇧🇷 Português 
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/brand/deskcomm-logo-dark.svg">
