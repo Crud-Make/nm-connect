@@ -31,6 +31,7 @@
     "lint:channels": "tsx scripts/lint-channels.ts",
     "lint:role-rank": "tsx scripts/lint-role-rank.ts",
     "checar:colisao-de-migration": "bash scripts/checar-colisao-de-migration.sh",
+    "checar:duplicacao": "bash scripts/nm/checar-duplicacao.sh",
     "skills:sync": "tsx scripts/sincronizar-skills.ts",
     "release:conferir": "tsx scripts/cortar-release.ts",
     "release:cortar": "tsx scripts/cortar-release.ts --escrever",

@@ -1,7 +1,5 @@
-import { redirect } from "next/navigation";
-
-import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
-import { traduzir } from "@/lib/i18n/dicionario";
+import { PaginaDeModulo } from "@/components/layout/PaginaDeModulo";
+import { exigirOrgDaPagina } from "@/lib/auth/org-da-pagina";
 
 import { ListaDeProcessos } from "./_client";
 
@@ -14,21 +12,14 @@ export const dynamic = "force-dynamic";
  * onde está a pessoa e a conversa com ela. Cada linha leva até lá.
  */
 export default async function Page() {
-  const user = await requireAuth();
-  const org = await resolveActiveOrg(user);
-  if (!org) redirect("/app");
-
-  const t = (texto: string) => traduzir(texto, user.idioma);
+  const { t } = await exigirOrgDaPagina();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold">{t("Processos")}</h1>
-        <p className="text-sm text-text-muted">
-          {t("Os processos de cada cliente, com a fase e o número CNJ.")}
-        </p>
-      </div>
+    <PaginaDeModulo
+      titulo={t("Processos")}
+      descricao={t("Os processos de cada cliente, com a fase e o número CNJ.")}
+    >
       <ListaDeProcessos />
-    </div>
+    </PaginaDeModulo>
   );
 }

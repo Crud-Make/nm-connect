@@ -215,6 +215,39 @@ DeskcommCRM é um sistema operacional de vendas open source com agentes de IA na
 
 ---
 
+## Regras NM (NM Connect) — NÃO NEGOCIÁVEIS
+
+Valem para todo PR do fork `Crud-Make/nm-connect`, somadas à doutrina acima.
+
+### 1. Reuso antes de código novo (DRY)
+- Antes de criar arquivo, função ou componente, procure o que já existe (pelo verbo e pelo domínio em
+  `lib/`, `components/`, `app/api/`) e **estenda**. Arquivo novo só quando não houver onde encaixar.
+- Cada integração que copia código multiplica o custo de manter: um conserto passa a ter de ser feito
+  em N lugares, e o que fica para trás vira defeito. Lógica repetida em duas features **vira função
+  compartilhada** na primeira repetição, não na terceira.
+- Quem cobra: `pnpm checar:duplicacao` (`scripts/nm/checar-duplicacao.sh`, passo do `nm-ci`). Ele
+  roda o jscpd no código todo e olha os clones que tocam os arquivos do PR: **clone em arquivo novo
+  reprova**; em arquivo que já existia, só anota, para a dívida antiga do upstream não travar o PR.
+
+### 2. Arquitetura agêntica modular e interligada
+Toda feature nova é um **módulo** que se encaixa no sistema, nunca uma ilha. Ela nasce assim:
+- **Fronteira clara:** dados, regras e telas da feature moram juntos (módulo de tabela pela ADR-0002
+  quando é de nicho); o núcleo segue inteiro com ela desligada.
+- **Alcançável pelos agentes:** expõe o que faz como capacidade tipada no catálogo
+  (`lib/mcp/tools/catalogo`), com escopo do turno (o contato vem da conversa, nunca do modelo), ou
+  escreve no PR por que não precisa.
+- **Interligada por contrato, não por acoplamento:** fala com as outras features por evento no
+  `event_log` (com consumidor registrado) e por funções/rotas públicas — nunca lendo a tabela interna
+  de outra feature.
+- **Estado de negócio no banco:** quando há fluxo (ex.: rascunho → aprovado), ele é máquina de estados
+  validada no banco; o agente só escolhe entre as transições permitidas.
+- **Agentes pequenos e seguros:** cada agente tem objetivo, ferramentas e métrica próprios; quem lê
+  conteúdo não confiável (e-mail, documento, intimação) não tem ferramenta de envio.
+- **Cumpre o sistema vivo:** checklist do DoD 13 (`docs/doctrine/sistema-vivo.md`) e peça nova no mapa
+  `docs/architecture/*.architecture.json` com ≥2 arestas para as features com que ela conversa.
+
+---
+
 ## Paths importantes
 
 | Path | Conteúdo |
