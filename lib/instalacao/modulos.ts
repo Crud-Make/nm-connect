@@ -42,7 +42,7 @@ import { logger } from "@/lib/logger";
 
 /**
  * `banco_externo`, `fluxos_atendimento`, `propostas`, `crm_b2b`, `cobranca` e `login_codex` ligam/desligam por uma linha em `platform_config`
- * (ver o resto deste arquivo). `honorarios` e `financeiro` são MÓDULOS DE TABELA (ADR-0002): a fonte da
+ * (ver o resto deste arquivo). `honorarios`, `financeiro` e `processos` são MÓDULOS DE TABELA (ADR-0002): a fonte da
  * verdade é `modulos_instalados`, escrita só por `fn_modulo_instalar` (`lib/modulos/service.ts`),
  * nunca por esta tela. Os dois mecanismos convivem na mesma lista porque é isso que
  * `deModuloDesligado` (catálogo de tools MCP) precisa: "este módulo, seja qual for o mecanismo
@@ -60,6 +60,10 @@ export const MODULOS_OPCIONAIS = [
   // provisionadora (`fn_financeiro_provisionar`) só roda onde o módulo está
   // instalado. `MODULOS_DE_TABELA` abaixo é o que faz `moduloLigado` enxergá-lo.
   "financeiro",
+  // Processos judiciais e andamentos do escritório (migration 0707) — módulo de
+  // tabela como os honorários: `fn_processos_provisionar` só roda onde o módulo
+  // está instalado em `/admin/modulos`.
+  "processos",
   "cobranca",
   "login_codex",
 ] as const;
@@ -67,7 +71,7 @@ export type ModuloOpcional = (typeof MODULOS_OPCIONAIS)[number];
 
 /** Os módulos de tabela do ADR-0002 dentro de `MODULOS_OPCIONAIS` — resolvidos por
  * `modulos_instalados.estado = 'ativo'`, nunca por `platform_config`. */
-const MODULOS_DE_TABELA = ["honorarios", "financeiro"] as const satisfies readonly ModuloOpcional[];
+const MODULOS_DE_TABELA = ["honorarios", "financeiro", "processos"] as const satisfies readonly ModuloOpcional[];
 
 /**
  * Só os módulos por FLAG — os que a tela `/admin/sistema` liga e desliga via
