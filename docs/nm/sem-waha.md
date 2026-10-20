@@ -39,6 +39,43 @@ Ele tira o `waha` do `up` padrão (profile), solta as dependências do `app` e d
 porque o `local.yml` fixa `WAHA_API_BASE_URL=http://waha:3000` e isso vence o
 `.env.local`. Sem o override, o próximo `up -d` recria o WAHA (imagem de 4 GB).
 
+### Imagens prontas do GitHub
+
+A máquina de dev não compila mais `app`, `worker` e `scheduler`. O fluxo:
+
+1. Merge na `main`.
+2. O workflow `nm-imagens` (`.github/workflows/nm-imagens.yml`) constrói as três
+   imagens para linux/amd64 e publica em `ghcr.io/crud-make/nm-connect-app`,
+   `-worker` e `-scheduler`, com as tags `main` e `sha-<7>`. Leva uns 15 min
+   (medida do upstream, com cache); a primeira rodada, sem cache, demora mais.
+   Acompanhe em Actions › nm-imagens.
+3. Na máquina, no checkout principal:
+
+```bash
+scripts/nm/atualizar-stack-local.sh
+```
+
+O script baixa as três imagens e recria os três contêineres, sem `--build`. Para
+voltar a um commit: `NM_IMAGEM_TAG=sha-1a2b3c4 scripts/nm/atualizar-stack-local.sh`.
+O `.env.local` não muda: o padrão de `NM_IMAGEM_TAG` é `main`.
+
+Para testar uma branch que ainda não entrou na `main`, compile como antes, com
+`up -d --build` e os dois arquivos de compose. O `build:` do `local.yml` continua
+lá para isso. O próximo `scripts/nm/atualizar-stack-local.sh` volta para a imagem
+da `main`.
+
+Cuidado com `up -d` sem o script: o override usa `pull_policy: always` (a tag
+`main` é móvel), e se o pull falhar (sem rede, pacote ainda privado) o Compose
+cai no `build:` e compila tudo nesta máquina. O script usa `--no-build` e para
+com erro.
+
+**Uma vez só, depois da primeira rodada do workflow:** o GHCR cria os pacotes
+privados, e o GitHub não deixa um workflow mudar isso. Em
+`https://github.com/Crud-Make?tab=packages`, abra cada um dos três pacotes
+(`nm-connect-app`, `nm-connect-worker`, `nm-connect-scheduler`) › Package
+settings › Danger Zone › Change visibility › Public. Assim o `pull` funciona sem
+`docker login`. Enquanto estiverem privados, o pull responde `denied`.
+
 ## O que fica desligado e por quê
 
 | Peça | Como | Efeito |
