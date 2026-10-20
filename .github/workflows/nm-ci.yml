@@ -80,6 +80,12 @@ jobs:
         if: matrix.parte == 2
         run: pnpm lint
 
+      # Regra DRY (CLAUDE.md › Regras NM): clone em arquivo novo reprova; em
+      # arquivo que já existia, só anota. Varre o código todo, ~1min30.
+      - name: Duplicação de código (DRY)
+        if: matrix.parte == 2
+        run: pnpm checar:duplicacao
+
       - name: Cercas estruturais
         if: matrix.parte == 3
         run: pnpm cercas

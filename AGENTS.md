@@ -548,6 +548,18 @@ renomeado ou com comando novo → o PR avisa que aquela página precisa acompanh
 PR do `deskcomm-site` que a página de changelog; quem quiser saber se já está no ar usa o `curl` da
 seção "A vitrine" em [`docs/doctrine/versionamento.md`](docs/doctrine/versionamento.md).
 
+## Regras NM (fork NM Connect)
+
+Texto completo na seção "Regras NM" do `CLAUDE.md`. Em resumo:
+
+1. **Reuso antes de código novo (DRY).** Procure e estenda o que já existe; lógica repetida em duas
+   features vira função compartilhada. `pnpm checar:duplicacao` (passo do `nm-ci`) reprova clone em
+   arquivo novo.
+2. **Arquitetura agêntica modular e interligada.** Toda feature nova é um módulo com fronteira clara,
+   alcançável pelos agentes por capacidade tipada no catálogo, ligada às outras features por evento
+   no `event_log` e por funções/rotas públicas (nunca pela tabela interna de outra), com o fluxo de
+   negócio como máquina de estados no banco e peça nova no mapa vivo com ≥2 arestas.
+
 ## Regra final — não invente
 
 Este repositório tem PRDs, specs, regras de negócio e doutrina escritos
