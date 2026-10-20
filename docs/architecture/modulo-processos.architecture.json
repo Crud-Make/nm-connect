@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": { "title": "Módulo Processos (advocacia) — banco e trava", "subtitle": "PR 1: as tabelas nascem na instalação do módulo, o andamento aprovado é o texto aprovado (hash no CHECK), e a trava do CPF confere também pelo cadastro do contato. Rotas e telas (PR 2) e a ferramenta da IA (PR 3) ainda não existem", "output": "modulo-processos.html", "quality_profile": "standard" },
+  "lanes": [
+    { "id": "operador", "label": "Administração" },
+    { "id": "servidor", "label": "Servidor" },
+    { "id": "banco", "label": "Persistência" }
+  ],
+  "mainPath": ["adminModulos", "instalar", "provisionadora", "processos", "andamentos", "aprovar"],
+  "nodes": [
+    { "id": "adminModulos", "lane": "operador", "col": 1, "type": "frontend", "label": "Admin › Módulos — catálogo lib/modulos/catalogo.ts (slug processos)" },
+    { "id": "instalar", "lane": "banco", "col": 2, "type": "database", "label": "fn_modulo_instalar / fn_reaplicar_modulos_instalados (modulos_instalados)" },
+    { "id": "provisionadora", "lane": "banco", "col": 3, "type": "database", "label": "fn_processos_provisionar — tabelas, RLS por operação, travas do suporte" },
+    { "id": "processos", "lane": "banco", "col": 4, "type": "database", "label": "processos — contato por FK composta, CNJ único por organização, área e fase" },
+    { "id": "andamentos", "lane": "banco", "col": 5, "type": "database", "label": "andamentos — texto para o cliente, rascunho/aprovado, CHECK do hash sha256" },
+    { "id": "aprovar", "lane": "banco", "col": 6, "type": "database", "label": "fn_processos_andamento_aprovar (manager+) / _editar (agent+, volta a rascunho)" },
+    { "id": "contatos", "lane": "banco", "col": 3, "type": "database", "label": "contacts (uq_contacts_org_id, cpf_encrypted)" },
+    { "id": "fusao", "lane": "banco", "col": 4, "type": "database", "label": "fn_mesclar_contatos — reponta a FK composta pelo catálogo (0611)" },
+    { "id": "lgpd", "lane": "banco", "col": 6, "type": "database", "label": "modulo_secoes_lgpd + trg_lgpd_secoes_de_modulo (apelido/texto [redigido], CNJ/hash nulos)" },
+    { "id": "conferirCpf", "lane": "banco", "col": 5, "type": "database", "label": "fn_conferir_cpf_do_contato — só boolean, só service_role (0706)" },
+    { "id": "verificacoes", "lane": "banco", "col": 6, "type": "database", "label": "verificacoes_de_identidade — connection_id nulo = cadastro (nulls not distinct)" },
+    { "id": "trava", "lane": "servidor", "col": 5, "type": "lib", "label": "conferencia-de-cpf.ts (conferirCpfDoContato) + conferencia-de-identidade.ts (concluirConferencia, recusaPelaTravaDoCpf)" },
+    { "id": "dadosExternos", "lane": "servidor", "col": 6, "type": "service", "label": "crm_query_external_data / crm_confirm_customer_identity (banco externo, mesma trava)" },
+    { "id": "central", "lane": "operador", "col": 6, "type": "frontend", "label": "Central de avisos — handoff ao bloquear a conferência" }
+  ],
+  "edges": [
+    { "id": "e1", "from": "adminModulos", "to": "instalar", "label": "instalar o módulo (recibo idempotente)" },
+    { "id": "e2", "from": "instalar", "to": "provisionadora", "label": "chama pelo nome; reaplica a cada atualização" },
+    { "id": "e3", "from": "provisionadora", "to": "processos", "label": "create table if not exists" },
+    { "id": "e4", "from": "provisionadora", "to": "andamentos", "label": "create table if not exists" },
+    { "id": "e5", "from": "provisionadora", "to": "lgpd", "label": "declara as duas seções" },
+    { "id": "e6", "from": "contatos", "to": "processos", "label": "FK composta (organização, contato)" },
+    { "id": "e7", "from": "processos", "to": "andamentos", "label": "FK composta, cascata ao apagar o processo" },
+    { "id": "e8", "from": "aprovar", "to": "andamentos", "label": "aprova (quem, quando, hash) ou edita e devolve a rascunho" },
+    { "id": "e9", "from": "fusao", "to": "processos", "label": "processo da ficha que sai vai para a que fica" },
+    { "id": "e10", "from": "contatos", "to": "lgpd", "label": "virada is_anonymized" },
+    { "id": "e11", "from": "lgpd", "to": "andamentos", "label": "texto [redigido], hash nulo (o aprovado segue válido no CHECK)" },
+    { "id": "e12", "from": "lgpd", "to": "processos", "label": "apelido [redigido], CNJ nulo" },
+    { "id": "e13", "from": "contatos", "to": "conferirCpf", "label": "cpf_encrypted decifrado dentro do banco" },
+    { "id": "e14", "from": "trava", "to": "conferirCpf", "label": "rpc com os 3 dígitos" },
+    { "id": "e15", "from": "trava", "to": "verificacoes", "label": "lê e grava a tentativa (conexão ou nula)" },
+    { "id": "e16", "from": "trava", "to": "central", "label": "3 erros: bloqueio + aviso" },
+    { "id": "e17", "from": "dadosExternos", "to": "trava", "label": "recusa sem conferência / cauda da conferência" }
+  ]
+}
