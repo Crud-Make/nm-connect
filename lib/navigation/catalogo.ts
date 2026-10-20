@@ -806,6 +806,20 @@ export const NAV_CATALOG = [
     modulo: "honorarios",
   },
   {
+    // Módulo de tabela (ADR-0002, migration 0707), irmão de Honorários: a porta só existe depois
+    // que o administrador da instalação instala `processos` em `/admin/modulos`. Seção de
+    // consulta, e não "Dinheiro": a lista é o índice; o trabalho (lançar e aprovar andamento)
+    // acontece na ficha do contato, onde a pessoa está.
+    href: "/app/processos",
+    label: "Processos",
+    description: "Os processos de cada cliente, com a fase e o número CNJ.",
+    icon: "ScalesSimple",
+    group: "analise",
+    section: "O histórico que se consulta",
+    minRole: "viewer",
+    modulo: "processos",
+  },
+  {
     href: "/app/metrics",
     label: "Desempenho",
     description: "Funil e performance por atendente nos últimos 30 dias.",

@@ -39,6 +39,7 @@ import { TimelineView } from "@/components/contacts/TimelineView";
 import { EditContactDialog } from "@/components/contacts/EditContactDialog";
 import { AnonymizeDialog } from "@/components/contacts/AnonymizeDialog";
 import { PropostasDeDado } from "@/components/contacts/PropostasDeDado";
+import { ProcessosDoContato } from "@/components/contacts/ProcessosDoContato";
 import { RoteirosDoContato } from "@/components/contacts/RoteirosDoContato";
 import { ConversaNoDossie } from "@/components/kanban/ConversaNoDossie";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
@@ -50,6 +51,8 @@ interface Props {
   contactId: string;
   /** Painéis de módulo de dados que declaram referência a contato. Resolvido no servidor. */
   paineisDeModulo?: { modulo: string; objeto: string }[];
+  /** Módulo `processos` instalado. Resolvido no servidor (`page.tsx`). */
+  processosAtivo?: boolean;
 }
 
 /**
@@ -70,7 +73,7 @@ function NivelDaOrigem({ rotulo, valor }: { rotulo: string; valor: string | null
   );
 }
 
-export function ContactDetailClient({ contactId, paineisDeModulo = [] }: Props) {
+export function ContactDetailClient({ contactId, paineisDeModulo = [], processosAtivo = false }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
   const q = useContact(contactId);
@@ -131,6 +134,7 @@ export function ContactDetailClient({ contactId, paineisDeModulo = [] }: Props) 
   // gate fica LADO A LADO com o `isAdmin` do desbloquear, cada um com seu
   // motivo: desfazer descadastro reabre um canal que o cliente fechou (só
   // admin, LGPD); pessoal é decisão operacional (gerente pode).
+  const podeEscrever = !contact.is_anonymized && user.support?.access_mode !== "support_readonly";
   const podeMarcarPessoal =
     (user.is_platform_admin && !user.support) ||
     (activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager);
@@ -419,6 +423,17 @@ export function ContactDetailClient({ contactId, paineisDeModulo = [] }: Props) 
           <div className="mt-4">
             <RoteirosDoContato contactId={contactId} />
           </div>
+          {/* Escrever segue a RLS de `processos`/`andamentos`: agent+ cadastra e lança, manager+
+              aprova. Anonimizado ou em suporte só leitura, o painel só lê. */}
+          {processosAtivo && (
+            <div className="mt-4">
+              <ProcessosDoContato
+                contactId={contactId}
+                podeEscrever={podeEscrever && Boolean(activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.agent)}
+                podeAprovar={podeEscrever && Boolean(activeOrg && ROLE_RANK[activeOrg.role] >= ROLE_RANK.manager)}
+              />
+            </div>
+          )}
           {/*
             O que os módulos de dados instalados guardam sobre esta pessoa. A lista vem do servidor e
             é vazia quando não há módulo com ficha de contato — então quem não instalou nada não vê
