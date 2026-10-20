@@ -4657,8 +4657,10 @@ export type Database = {
           source_metadata: Json
           tags: string[]
           updated_at: string
+          wa_bsuid: string | null
           wa_identity: string | null
           wa_lid: string | null
+          wa_username: string | null
         }
         Insert: {
           ai_authorized_at?: string | null
@@ -4701,8 +4703,10 @@ export type Database = {
           source_metadata?: Json
           tags?: string[]
           updated_at?: string
+          wa_bsuid?: string | null
           wa_identity?: string | null
           wa_lid?: string | null
+          wa_username?: string | null
         }
         Update: {
           ai_authorized_at?: string | null
@@ -4745,8 +4749,10 @@ export type Database = {
           source_metadata?: Json
           tags?: string[]
           updated_at?: string
+          wa_bsuid?: string | null
           wa_identity?: string | null
           wa_lid?: string | null
+          wa_username?: string | null
         }
         Relationships: [
           {
@@ -11095,6 +11101,17 @@ export type Database = {
           p_org: string
         }
         Returns: Json
+      }
+      fn_upsert_meta_contact: {
+        Args: {
+          p_bsuid: string
+          p_chat_id: string
+          p_notify: string
+          p_org: string
+          p_phone: string
+          p_username: string
+        }
+        Returns: string
       }
       fn_upsert_wa_contact: {
         Args: {

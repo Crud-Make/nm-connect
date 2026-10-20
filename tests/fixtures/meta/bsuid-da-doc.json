@@ -1,0 +1,262 @@
+{
+  "_origem": "Exemplos da página oficial da Meta 'IDs do usuário no escopo da empresa' (developers.facebook.com/documentation/business-messaging/whatsapp/business-scoped-user-ids, atualizada em 15/09/2026), lidos em 20/10/2026. Comentários <!-- --> removidos; os marcadores <...> trocados pelos valores CONCRETOS que a própria página usa nos exemplos preenchidos (US.13491208655302741918, realsheenanelson, 16505551234, 106540352242922). Campos que a página marca como condicionais e que não se aplicam ao caso (group_id em conversa 1:1; vcard quando origin = contact_request) foram retirados, como a página descreve.",
+  "contatos_request_contact_info": {
+    "object": "whatsapp_business_account",
+    "entry": [
+      {
+        "id": "102290129340398",
+        "changes": [
+          {
+            "value": {
+              "messaging_product": "whatsapp",
+              "metadata": {
+                "display_phone_number": "15550783881",
+                "phone_number_id": "106540352242922"
+              },
+              "contacts": [
+                {
+                  "profile": {
+                    "name": "Sheena Nelson",
+                    "username": "realsheenanelson"
+                  },
+                  "user_id": "US.13491208655302741918"
+                }
+              ],
+              "messages": [
+                {
+                  "id": "wamid.HBgLMTY1MDM4Nzk0MzkVAgASGBQzQTRBNjU5OUFFRTAzODEwMTQ0RgA=",
+                  "timestamp": "1749416383",
+                  "type": "contacts",
+                  "from_user_id": "US.13491208655302741918",
+                  "contacts": [
+                    {
+                      "origin": "contact_request",
+                      "phones": [
+                        {
+                          "phone": "16505551234",
+                          "wa_id": "16505551234",
+                          "type": "CELL"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "field": "messages"
+          }
+        ]
+      }
+    ]
+  },
+  "status_entregue": {
+    "object": "whatsapp_business_account",
+    "entry": [
+      {
+        "id": "102290129340398",
+        "changes": [
+          {
+            "value": {
+              "messaging_product": "whatsapp",
+              "metadata": {
+                "display_phone_number": "15550783881",
+                "phone_number_id": "106540352242922"
+              },
+              "contacts": [
+                {
+                  "profile": {
+                    "name": "Sheena Nelson",
+                    "username": "realsheenanelson"
+                  },
+                  "wa_id": "16505551234",
+                  "user_id": "US.13491208655302741918",
+                  "parent_user_id": "US.ENT.11815799212886844830"
+                }
+              ],
+              "statuses": [
+                {
+                  "id": "wamid.HBgLMTY1MDM4Nzk0MzkVAgASGBQzQTRBNjU5OUFFRTAzODEwMTQ0RgA=",
+                  "status": "delivered",
+                  "timestamp": "1749416383",
+                  "recipient_id": "16505551234",
+                  "recipient_user_id": "US.13491208655302741918",
+                  "recipient_parent_user_id": "US.ENT.11815799212886844830"
+                }
+              ]
+            },
+            "field": "messages"
+          }
+        ]
+      }
+    ]
+  },
+  "status_falhou": {
+    "object": "whatsapp_business_account",
+    "entry": [
+      {
+        "id": "102290129340398",
+        "changes": [
+          {
+            "value": {
+              "messaging_product": "whatsapp",
+              "metadata": {
+                "display_phone_number": "15550783881",
+                "phone_number_id": "106540352242922"
+              },
+              "statuses": [
+                {
+                  "id": "wamid.HBgLMTY1MDM4Nzk0MzkVAgASGBQzQUFERjg0NDEzNDdFODU3MUMxMAA=",
+                  "status": "failed",
+                  "timestamp": "1750030073",
+                  "recipient_id": "16505551234",
+                  "errors": [
+                    {
+                      "code": 131049,
+                      "title": "This message was not delivered to maintain healthy ecosystem engagement.",
+                      "message": "This message was not delivered to maintain healthy ecosystem engagement.",
+                      "error_data": {
+                        "details": "In order to maintain a healthy ecosystem engagement, the message failed to be delivered."
+                      },
+                      "href": "/documentation/business-messaging/whatsapp/support/error-codes"
+                    }
+                  ]
+                }
+              ]
+            },
+            "field": "messages"
+          }
+        ]
+      }
+    ]
+  },
+  "mensagem_telefone_e_bsuid": {
+    "object": "whatsapp_business_account",
+    "entry": [
+      {
+        "id": "102290129340398",
+        "changes": [
+          {
+            "value": {
+              "messaging_product": "whatsapp",
+              "metadata": {
+                "display_phone_number": "15550783881",
+                "phone_number_id": "106540352242922"
+              },
+              "contacts": [
+                {
+                  "profile": {
+                    "name": "Sheena Nelson",
+                    "username": "realsheenanelson"
+                  },
+                  "wa_id": "16505551234",
+                  "user_id": "US.13491208655302741918",
+                  "parent_user_id": "US.ENT.11815799212886844830"
+                }
+              ],
+              "messages": [
+                {
+                  "from": "16505551234",
+                  "from_user_id": "US.13491208655302741918",
+                  "from_parent_user_id": "US.ENT.11815799212886844830",
+                  "id": "wamid.HBgLMTY1MDM4Nzk0MzkVAgASGBQzQTRBNjU5OUFFRTAzODEwMTQ0RgA=",
+                  "timestamp": "1749416383",
+                  "type": "text",
+                  "text": {
+                    "body": "Does it come in another color?"
+                  }
+                }
+              ]
+            },
+            "field": "messages"
+          }
+        ]
+      }
+    ]
+  },
+  "mensagem_so_bsuid": {
+    "object": "whatsapp_business_account",
+    "entry": [
+      {
+        "id": "102290129340398",
+        "changes": [
+          {
+            "value": {
+              "messaging_product": "whatsapp",
+              "metadata": {
+                "display_phone_number": "15550783881",
+                "phone_number_id": "106540352242922"
+              },
+              "contacts": [
+                {
+                  "profile": {
+                    "name": "Sheena Nelson",
+                    "username": "realsheenanelson"
+                  },
+                  "user_id": "US.13491208655302741918",
+                  "parent_user_id": "US.ENT.11815799212886844830"
+                }
+              ],
+              "messages": [
+                {
+                  "from_user_id": "US.13491208655302741918",
+                  "from_parent_user_id": "US.ENT.11815799212886844830",
+                  "id": "wamid.HBgLMTY1MDM4Nzk0MzkVAgASGBQzQTRBNjU5OUFFRTAzODEwMTQ0RgA=",
+                  "timestamp": "1749416383",
+                  "type": "text",
+                  "text": {
+                    "body": "Does it come in another color?"
+                  }
+                }
+              ]
+            },
+            "field": "messages"
+          }
+        ]
+      }
+    ]
+  },
+  "eco_smb": {
+    "object": "whatsapp_business_account",
+    "entry": [
+      {
+        "id": "102290129340398",
+        "changes": [
+          {
+            "value": {
+              "messaging_product": "whatsapp",
+              "metadata": {
+                "display_phone_number": "15550783881",
+                "phone_number_id": "106540352242922"
+              },
+              "contacts": [
+                {
+                  "profile": {
+                    "username": "realsheenanelson"
+                  },
+                  "wa_id": "16505551234",
+                  "user_id": "US.13491208655302741918",
+                  "parent_user_id": "US.ENT.11815799212886844830"
+                }
+              ],
+              "message_echoes": [
+                {
+                  "from": "15550783881",
+                  "to": "16505551234",
+                  "to_user_id": "US.13491208655302741918",
+                  "to_parent_user_id": "US.ENT.11815799212886844830",
+                  "id": "wamid.HBgLMTY1MDM4Nzk0MzkVAgASGBQzQTRBNjU5OUFFRTAzODEwMTQ0RgA=",
+                  "timestamp": "1749416383",
+                  "type": "text",
+                  "text": {
+                    "body": "Oi! Tem sim."
+                  }
+                }
+              ]
+            },
+            "field": "smb_message_echoes"
+          }
+        ]
+      }
+    ]
+  }
+}
