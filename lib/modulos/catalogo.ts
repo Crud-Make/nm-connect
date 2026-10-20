@@ -35,6 +35,15 @@ export const CATALOGO_DE_MODULOS: readonly ModuloCatalogo[] = [
       "continua no sistema mesmo sem este módulo. Toda instalação anterior a esta versão " +
       "continua com Comandas ligada.",
   },
+  {
+    // Migration 0707: as tabelas `processos` e `andamentos` nascem SÓ onde o
+    // módulo é instalado (ADR-0002 D2/D3).
+    slug: "processos",
+    nome: "Processos (advocacia)",
+    descricao:
+      "Os processos de cada cliente e os andamentos escritos para ele, aprovados pela equipe " +
+      "antes de chegar ao cliente. Para escritórios de advocacia.",
+  },
 ];
 
 export function moduloDoCatalogo(slug: string): ModuloCatalogo | undefined {

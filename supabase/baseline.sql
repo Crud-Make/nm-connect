@@ -52500,6 +52500,347 @@ on conflict (model) do update set
 
 notify pgrst, 'reload schema';
 
+-- ---- trava do CPF pelo cadastro do contato: a função (migration 0706) ----
+-- A metade que CRIA FUNÇÃO, por isso aqui, antes da VARREDURA anon. A outra metade
+-- (connection_id nulo + nulls not distinct) fica no fim do arquivo, depois do bloco
+-- da 0676, que é quem cria `verificacoes_de_identidade`. O porquê está na migration.
+
+create or replace function public.fn_conferir_cpf_do_contato(
+  p_org uuid,
+  p_contato uuid,
+  p_digitos text
+) returns boolean
+    language plpgsql stable security definer
+    set search_path to 'public', 'private', 'extensions', 'pg_temp'
+    as $$
+declare
+  v_cipher bytea;
+begin
+  select cpf_encrypted into v_cipher
+    from public.contacts
+   where id = p_contato
+     and organization_id = p_org;
+
+  if v_cipher is null then return null; end if;
+  if octet_length(v_cipher) < 66 then
+    raise exception 'cpf_ciphertext_invalido';
+  end if;
+  if get_byte(v_cipher, 0) < 128 then
+    raise exception 'cpf_ciphertext_invalido';
+  end if;
+
+  if p_digitos is null or p_digitos !~ '^[0-9]{3}$' then
+    return false;
+  end if;
+
+  return right(regexp_replace(pgp_sym_decrypt(v_cipher, private.fn_cpf_key()), '[^0-9]', '', 'g'), 3) = p_digitos;
+end$$;
+
+revoke execute on function public.fn_conferir_cpf_do_contato(uuid, uuid, text) from public, anon, authenticated;
+grant  execute on function public.fn_conferir_cpf_do_contato(uuid, uuid, text) to service_role;
+
+comment on function public.fn_conferir_cpf_do_contato(uuid, uuid, text) is
+  'A trava do CPF pelo cadastro (0706): os 3 últimos dígitos conferem com contacts.cpf_encrypted? NULL = o contato não tem CPF. Nunca devolve o CPF. Só service_role.';
+
+-- ---- módulo processos: provisionadora, seção de LGPD e RPCs do andamento (migration 0707) ----
+-- Mesmo texto da migration, que traz o porquê de cada peça. Cria FUNÇÃO, por isso antes da
+-- VARREDURA anon. Nenhuma tabela nasce aqui: `processos` e `andamentos` só existem onde o
+-- módulo é instalado (`fn_modulo_instalar`), e o bloco da 0340 lá embaixo reaplica a
+-- provisionadora onde ele já está.
+
+create or replace function public.fn_processos_provisionar()
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $f$
+begin
+  create table if not exists public.processos (
+    id uuid primary key default gen_random_uuid(),
+    organization_id uuid not null references public.organizations(id) on delete cascade,
+    contact_id uuid not null,
+    numero_cnj text,
+    apelido text not null check (char_length(btrim(apelido)) between 1 and 120),
+    -- `text` + CHECK, não enum (doutrina: enum é difícil de estender).
+    area text not null check (area in ('civel', 'trabalhista', 'familia', 'previdenciario', 'criminal', 'tributario', 'outra')),
+    fase text not null default 'conhecimento' check (fase in ('conhecimento', 'recurso', 'execucao', 'arquivado')),
+    advogado_user_id uuid references auth.users(id) on delete set null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+
+    -- NNNNNNN-DD.AAAA.J.TR.OOOO (Resolução CNJ 65/2008): a forma, não o dígito verificador.
+    constraint processos_numero_cnj_formato check (
+      numero_cnj is null or numero_cnj ~ '^[0-9]{7}-[0-9]{2}\.[0-9]{4}\.[0-9]\.[0-9]{2}\.[0-9]{4}$'
+    ),
+    constraint processos_numero_unico unique (organization_id, numero_cnj),
+    -- O alvo da FK composta de `andamentos`.
+    constraint processos_org_id_unico unique (organization_id, id),
+    constraint processos_contato_fkey foreign key (organization_id, contact_id)
+      references public.contacts (organization_id, id)
+  );
+
+  create index if not exists processos_org_contato_idx
+    on public.processos (organization_id, contact_id);
+
+  create table if not exists public.andamentos (
+    id uuid primary key default gen_random_uuid(),
+    organization_id uuid not null references public.organizations(id) on delete cascade,
+    processo_id uuid not null,
+    -- O texto PARA O CLIENTE: é o que a IA vai contar a ele, palavra por palavra.
+    texto text not null constraint andamentos_texto_check check (char_length(btrim(texto)) between 1 and 2000),
+    status text not null default 'rascunho' check (status in ('rascunho', 'aprovado')),
+    criado_por uuid references auth.users(id) on delete set null,
+    aprovado_por uuid references auth.users(id) on delete set null,
+    aprovado_em timestamptz,
+    hash_aprovado text,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+
+    -- Andamento não existe fora do processo: apagar o processo (manager+) leva os andamentos.
+    constraint andamentos_processo_fkey foreign key (organization_id, processo_id)
+      references public.processos (organization_id, id) on delete cascade,
+
+    -- A INVALIDAÇÃO POR CONSTRUÇÃO: mudar o texto de um aprovado sem refazer o hash falha aqui,
+    -- para qualquer papel, inclusive o dono do banco. O escape é só o da anonimização (cabeçalho).
+    constraint andamentos_aprovacao_coerente check (
+      (status = 'rascunho' and aprovado_por is null and aprovado_em is null and hash_aprovado is null)
+      or (status = 'aprovado' and aprovado_em is not null and (
+            hash_aprovado = encode(sha256(convert_to(texto, 'UTF8')), 'hex')
+            or (texto = '[redigido]' and hash_aprovado is null)))
+    )
+  );
+
+  create index if not exists andamentos_org_processo_idx
+    on public.andamentos (organization_id, processo_id, created_at desc);
+
+  drop trigger if exists processos_updated_at on public.processos;
+  create trigger processos_updated_at before update on public.processos
+    for each row execute function public.fn_set_updated_at();
+  drop trigger if exists andamentos_updated_at on public.andamentos;
+  create trigger andamentos_updated_at before update on public.andamentos
+    for each row execute function public.fn_set_updated_at();
+
+  -- ── RLS POR OPERAÇÃO (D5, ligada aqui e não pela rotina automática) ────────
+  -- `create policy X` e `on public.Y` em linhas separadas: a conferência do update.sh antigo lê o
+  -- baseline linha a linha e cobraria a regra onde o módulo não está instalado (#1906).
+  alter table public.processos enable row level security;
+  drop policy if exists tenant_isolation_processos_all on public.processos;
+
+  drop policy if exists processos_select on public.processos;
+  create policy processos_select
+    on public.processos
+    for select using (
+      organization_id in (select public.fn_user_org_ids()) or public.fn_is_platform_admin()
+    );
+
+  drop policy if exists processos_insert on public.processos;
+  create policy processos_insert
+    on public.processos
+    for insert
+    with check (public.fn_is_platform_admin_full()
+                or (organization_id in (select public.fn_user_org_ids())
+                    and public.fn_role_at_least(organization_id, 'agent')));
+
+  drop policy if exists processos_update on public.processos;
+  create policy processos_update
+    on public.processos
+    for update
+    using (public.fn_is_platform_admin_full()
+           or (organization_id in (select public.fn_user_org_ids())
+               and public.fn_role_at_least(organization_id, 'agent')))
+    with check (public.fn_is_platform_admin_full()
+                or (organization_id in (select public.fn_user_org_ids())
+                    and public.fn_role_at_least(organization_id, 'agent')));
+
+  drop policy if exists processos_delete on public.processos;
+  create policy processos_delete
+    on public.processos
+    for delete
+    using (public.fn_is_platform_admin_full()
+           or (organization_id in (select public.fn_user_org_ids())
+               and public.fn_role_at_least(organization_id, 'manager')));
+  revoke all on public.processos from anon;
+
+  -- O aprovado é o que o cliente vai ouvir, e é o que o `viewer` lê. O rascunho é trabalho da
+  -- equipe (agent+). A sessão só escreve rascunho: aprovar, e editar o aprovado, são das RPCs.
+  alter table public.andamentos enable row level security;
+  drop policy if exists tenant_isolation_andamentos_all on public.andamentos;
+
+  drop policy if exists andamentos_select on public.andamentos;
+  create policy andamentos_select
+    on public.andamentos
+    for select using (
+      (organization_id in (select public.fn_user_org_ids())
+       and (status = 'aprovado' or public.fn_role_at_least(organization_id, 'agent')))
+      or public.fn_is_platform_admin()
+    );
+
+  drop policy if exists andamentos_insert on public.andamentos;
+  create policy andamentos_insert
+    on public.andamentos
+    for insert
+    with check ((public.fn_is_platform_admin_full()
+                 or (organization_id in (select public.fn_user_org_ids())
+                     and public.fn_role_at_least(organization_id, 'agent')))
+                and status = 'rascunho');
+
+  drop policy if exists andamentos_update on public.andamentos;
+  create policy andamentos_update
+    on public.andamentos
+    for update
+    using ((public.fn_is_platform_admin_full()
+            or (organization_id in (select public.fn_user_org_ids())
+                and public.fn_role_at_least(organization_id, 'agent')))
+           and status = 'rascunho')
+    with check ((public.fn_is_platform_admin_full()
+                 or (organization_id in (select public.fn_user_org_ids())
+                     and public.fn_role_at_least(organization_id, 'agent')))
+                and status = 'rascunho');
+
+  drop policy if exists andamentos_delete on public.andamentos;
+  create policy andamentos_delete
+    on public.andamentos
+    for delete
+    using ((public.fn_is_platform_admin_full()
+            or (organization_id in (select public.fn_user_org_ids())
+                and public.fn_role_at_least(organization_id, 'agent')))
+           and status = 'rascunho');
+  revoke all on public.andamentos from anon;
+
+  comment on table public.processos is
+    'Processo judicial do cliente (módulo processos, migration 0707). Contato por FK composta com a organização; número CNJ nulo até a distribuição ou depois da anonimização.';
+  comment on table public.andamentos is
+    'O que aconteceu no processo, no texto que vai PARA O CLIENTE. Aprovado = hash_aprovado é o sha256 do texto (CHECK); aprovar e editar o aprovado só pelas RPCs fn_processos_andamento_*.';
+
+  -- D8: a anonimização alcança as duas tabelas pela seção declarada (0485).
+  perform public.fn_processos_declarar_secoes_lgpd();
+
+  -- RLS já ligada por nós, então esta rotina não mexe mais nelas (D5) — só
+  -- aplica as travas de suporte, que dependem de RLS já estar de pé.
+  perform public.fn_proteger_modulo_provisionado();
+end;
+$f$;
+
+revoke execute on function public.fn_processos_provisionar() from public, anon, authenticated;
+grant execute on function public.fn_processos_provisionar() to service_role;
+
+-- ---- a seção de LGPD do módulo (D8) ----
+--
+-- Texto sobre a pessoa: o apelido do processo ("Divórcio da Maria") e o texto do andamento viram
+-- `[redigido]` onde havia texto; o número CNJ e o hash do aprovado viram nulo (o número leva à
+-- pessoa por consulta pública; o hash é impressão digital do texto que saiu). Área, fase, datas e
+-- o vínculo ficam: operação do escritório, não dado da pessoa. Export e cópia ao titular: PR 3.
+--
+-- Rotina própria, e não `insert` no corpo da provisionadora, porque o molde reprova corpo de
+-- módulo que escreve em tabela do núcleo (0619). Chamada só pela provisionadora: as tabelas
+-- deste módulo nunca existiram antes dela, então não há a "porta A" da 0619. `do update` para a
+-- declaração convergir quando o kit reaplica.
+create or replace function public.fn_processos_declarar_secoes_lgpd()
+returns void language plpgsql security definer set search_path = public, pg_temp as $f$
+begin
+  insert into public.modulo_secoes_lgpd
+      (modulo, tabela, ligacao, colunas, colunas_rotulo, colunas_redigidas, colunas_agora)
+    values
+      ('processos', 'processos',
+       'organization_id = $1 and contact_id = $2',
+       array['numero_cnj'], '{}'::text[], array['apelido'], '{}'::text[]),
+      ('processos', 'andamentos',
+       'organization_id = $1 and processo_id in (select p.id from public.processos p where p.organization_id = $1 and p.contact_id = $2)',
+       array['hash_aprovado'], '{}'::text[], array['texto'], '{}'::text[])
+    on conflict (modulo, tabela) do update
+      set ligacao = excluded.ligacao,
+          colunas = excluded.colunas,
+          colunas_rotulo = excluded.colunas_rotulo,
+          colunas_redigidas = excluded.colunas_redigidas,
+          colunas_agora = excluded.colunas_agora;
+end $f$;
+
+revoke execute on function public.fn_processos_declarar_secoes_lgpd() from public, anon, authenticated;
+grant execute on function public.fn_processos_declarar_secoes_lgpd() to service_role;
+
+-- ---- fn_processos_andamento_aprovar: a única porta de aprovar ----
+--
+-- `for update` torna a transição rascunho→aprovado atômica: dois cliques leem a mesma linha em
+-- fila, e o segundo encontra `aprovado` e é recusado, sem regravar quem aprovou nem quando. O hash
+-- é calculado AQUI, do texto que está na linha travada — nunca vem de quem chama.
+create or replace function public.fn_processos_andamento_aprovar(p_org uuid, p_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_andamento record;
+  v_resultado jsonb;
+begin
+  if auth.uid() is null or not public.fn_role_at_least(p_org, 'manager') then
+    raise exception 'processos_forbidden' using errcode = '42501';
+  end if;
+
+  select id, status into v_andamento from public.andamentos
+   where id = p_id and organization_id = p_org
+   for update;
+
+  if not found then
+    raise exception 'andamento_nao_encontrado' using errcode = 'P0002';
+  end if;
+  if v_andamento.status = 'aprovado' then
+    raise exception 'andamento_ja_aprovado' using errcode = '22023';
+  end if;
+
+  update public.andamentos a
+     set status = 'aprovado',
+         aprovado_por = auth.uid(),
+         aprovado_em = now(),
+         hash_aprovado = encode(sha256(convert_to(a.texto, 'UTF8')), 'hex')
+   where a.id = p_id
+  returning to_jsonb(a) into v_resultado;
+
+  return v_resultado;
+end;
+$$;
+
+revoke execute on function public.fn_processos_andamento_aprovar(uuid, uuid) from public, anon;
+grant execute on function public.fn_processos_andamento_aprovar(uuid, uuid) to authenticated;
+
+-- ---- fn_processos_andamento_editar: o texto novo volta a rascunho ----
+--
+-- Editar um aprovado é o caminho que a RLS fecha para a sessão. Aqui o texto muda e a aprovação
+-- some na MESMA escrita — o CHECK de coerência não deixaria outro desfecho, e quem aprovou o
+-- texto antigo não aprovou o novo.
+create or replace function public.fn_processos_andamento_editar(p_org uuid, p_id uuid, p_texto text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_resultado jsonb;
+begin
+  if auth.uid() is null or not public.fn_role_at_least(p_org, 'agent') then
+    raise exception 'processos_forbidden' using errcode = '42501';
+  end if;
+
+  update public.andamentos a
+     set texto = p_texto,
+         status = 'rascunho',
+         aprovado_por = null,
+         aprovado_em = null,
+         hash_aprovado = null
+   where a.id = p_id and a.organization_id = p_org
+  returning to_jsonb(a) into v_resultado;
+
+  if v_resultado is null then
+    raise exception 'andamento_nao_encontrado' using errcode = 'P0002';
+  end if;
+
+  return v_resultado;
+end;
+$$;
+
+revoke execute on function public.fn_processos_andamento_editar(uuid, uuid, text) from public, anon;
+grant execute on function public.fn_processos_andamento_editar(uuid, uuid, text) to authenticated;
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -55188,3 +55529,20 @@ drop policy if exists tenant_isolation_verificacoes_de_identidade_select on publ
 create policy tenant_isolation_verificacoes_de_identidade_select on public.verificacoes_de_identidade
   for select
   using (organization_id in (select * from public.fn_user_org_ids()));
+
+-- ---- trava do CPF pelo cadastro do contato: a conexão nula (migration 0706) ----
+-- Não cria função, então pode ficar depois da VARREDURA anon; e TEM de vir depois
+-- do bloco da 0676, que cria a tabela. A função da mesma migration está antes da
+-- VARREDURA. Nenhuma linha existente tem conexão nula: não há o que deduplicar.
+
+alter table public.verificacoes_de_identidade
+  alter column connection_id drop not null;
+
+alter table public.verificacoes_de_identidade
+  drop constraint if exists verificacoes_de_identidade_unica;
+alter table public.verificacoes_de_identidade
+  add constraint verificacoes_de_identidade_unica
+    unique nulls not distinct (organization_id, contact_id, connection_id);
+
+comment on column public.verificacoes_de_identidade.connection_id is
+  'O banco externo em que a conferência foi feita. NULL = conferência contra o CPF do cadastro do contato (fn_conferir_cpf_do_contato). Única por (organização, contato, conexão) com nulls not distinct.';

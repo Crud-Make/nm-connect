@@ -28,6 +28,9 @@
  * `public.verificacoes_de_identidade`, uma linha por (organização, contato,
  * conexão). O banco externo é só leitura (`BEGIN READ ONLY` em `consultar`), e
  * a função é `stable` — a conferência cabe na mesma transação somente-leitura.
+ *
+ * Sem banco externo, a mesma trava confere contra o CPF do CADASTRO do contato
+ * (`conferirCpfDoContato`, migration 0706), na linha de conexão nula.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type pg from "pg";
@@ -141,20 +144,28 @@ interface LinhaDaConferencia {
 
 const data = (v: string | null): Date | null => (v ? new Date(v) : null);
 
-/** O estado guardado. `null` = nunca conferiu. Erro de leitura LANÇA: quem chama falha fechado. */
+/**
+ * O estado guardado. `null` = nunca conferiu. Erro de leitura LANÇA: quem chama falha fechado.
+ *
+ * `conexaoId` nulo é a conferência contra o CPF do CADASTRO do contato
+ * (`conferirCpfDoContato`, migration 0706): a mesma linha, com `connection_id`
+ * nulo — e o filtro precisa de `is null`, porque `= null` não casa nada.
+ */
 export async function lerConferencia(
   supabase: SupabaseClient,
   organizationId: string,
   contatoId: string,
-  conexaoId: string,
+  conexaoId: string | null,
 ): Promise<EstadoDaConferencia | null> {
-  const { data: linha, error } = await supabase
+  const consulta = supabase
     .from("verificacoes_de_identidade")
     .select("verificado_ate, tentativas_falhas, bloqueado_ate")
     .eq("organization_id", organizationId)
-    .eq("contact_id", contatoId)
-    .eq("connection_id", conexaoId)
-    .maybeSingle<LinhaDaConferencia>();
+    .eq("contact_id", contatoId);
+  const { data: linha, error } = await (conexaoId === null
+    ? consulta.is("connection_id", null)
+    : consulta.eq("connection_id", conexaoId)
+  ).maybeSingle<LinhaDaConferencia>();
   if (error) throw new Error(`ler_conferencia_falhou: ${error.message}`);
   if (!linha) return null;
   return {
@@ -168,9 +179,11 @@ export async function gravarConferencia(
   supabase: SupabaseClient,
   organizationId: string,
   contatoId: string,
-  conexaoId: string,
+  conexaoId: string | null,
   estado: EstadoDaConferencia,
 ): Promise<void> {
+  // Com a conexão nula o upsert continua convergindo para UMA linha: a
+  // unicidade é `nulls not distinct` desde a 0706.
   const { error } = await supabase.from("verificacoes_de_identidade").upsert(
     {
       organization_id: organizationId,
@@ -184,6 +197,28 @@ export async function gravarConferencia(
     { onConflict: "organization_id,contact_id,connection_id" },
   );
   if (error) throw new Error(`gravar_conferencia_falhou: ${error.message}`);
+}
+
+/**
+ * A conferência contra o CPF do CADASTRO do contato (migration 0706), para quem
+ * não tem banco externo. A comparação é do banco: `fn_conferir_cpf_do_contato`
+ * decifra `contacts.cpf_encrypted` lá dentro e devolve só `boolean` — o CPF não
+ * chega a este servidor. `null` = o contato não tem CPF no cadastro. Erro LANÇA:
+ * falha do banco não é erro do cliente e não pode gastar tentativa.
+ */
+export async function conferirCpfDoContato(
+  supabase: SupabaseClient,
+  organizationId: string,
+  contatoId: string,
+  digitos: string,
+): Promise<boolean | null> {
+  const { data, error } = await supabase.rpc("fn_conferir_cpf_do_contato", {
+    p_org: organizationId,
+    p_contato: contatoId,
+    p_digitos: digitos,
+  });
+  if (error) throw new Error(`conferir_cpf_do_contato_falhou: ${error.message}`);
+  return typeof data === "boolean" ? data : null;
 }
 
 /** As conexões ATIVAS desta organização que exigem a conferência. */

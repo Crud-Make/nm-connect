@@ -102,6 +102,27 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
       "fn_role_at_least(p_org, 'manager'), mesmo papel da RLS de honorarios_parcelas.",
   },
   {
+    fn: "fn_processos_andamento_aprovar(uuid,uuid)",
+    razao:
+      "SEM call site ainda, e declarado: as rotas de andamento do módulo processos são o PR 2 " +
+      "(a migration 0707 é o PR 1, só banco). Concedida a authenticated já agora porque é a " +
+      "ÚNICA porta de aprovar: a RLS de andamentos fecha para a sessão o UPDATE de aprovado e a " +
+      "transição para aprovado. Definer porque grava quem aprovou, quando e o sha256 do texto da " +
+      "linha travada (FOR UPDATE), que o CHECK andamentos_aprovacao_coerente exige. Recusa sem " +
+      "auth.uid() (a service key não aprova) e exige fn_role_at_least(p_org, 'manager'); toda " +
+      "leitura é fechada por organization_id. Provado em processos-andamento-aprovado.test.ts.",
+  },
+  {
+    fn: "fn_processos_andamento_editar(uuid,uuid,text)",
+    razao:
+      "SEM call site ainda, e declarado: chega com as rotas do PR 2 do módulo processos. É a " +
+      "única porta de reescrever um andamento APROVADO — a RLS só deixa a sessão escrever " +
+      "rascunho — e a escrita devolve a rascunho zerando a aprovação na mesma linha, o desfecho " +
+      "que o CHECK andamentos_aprovacao_coerente obriga. Recusa sem auth.uid() e exige " +
+      "fn_role_at_least(p_org, 'agent'); o update é fechado por organization_id + id. Provado em " +
+      "processos-andamento-aprovado.test.ts.",
+  },
+  {
     fn: "fn_finalizar_comanda(uuid,uuid,uuid,integer)",
     razao:
       "POST app/api/v1/financeiro/comandas/[id]/finalizar/route.ts e " +
