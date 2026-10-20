@@ -2,7 +2,7 @@
 # Docs: https://supabase.com/docs/guides/cli/config
 # Este arquivo é versionado. Segredos vivem em .env.local (dev) ou no .env da instalação.
 
-project_id = "deskcomm-crm"
+project_id = "nm-connect"
 
 [api]
 enabled = true

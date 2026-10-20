@@ -23,6 +23,22 @@ docker compose -f docker-compose.prod.yml -f docker-compose.traefik.yml \
 
 Precisa do Docker Compose 2.24.4 ou mais novo, por causa da tag `!override`.
 
+## Na máquina de desenvolvimento
+
+O `docker-compose.local.yml` também sobe o WAHA, e o `app` e o `worker` esperam
+por ele. O override `docker-compose.local.nm.yml` faz o mesmo papel do de
+produção:
+
+```bash
+docker compose -f docker-compose.local.yml -f docker-compose.local.nm.yml \
+  --env-file .env.local up -d
+```
+
+Ele tira o `waha` do `up` padrão (profile), solta as dependências do `app` e do
+`worker` e põe no `app` os mesmos valores de `WAHA_*` do `.env.nm.example`,
+porque o `local.yml` fixa `WAHA_API_BASE_URL=http://waha:3000` e isso vence o
+`.env.local`. Sem o override, o próximo `up -d` recria o WAHA (imagem de 4 GB).
+
 ## O que fica desligado e por quê
 
 | Peça | Como | Efeito |

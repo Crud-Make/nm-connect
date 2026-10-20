@@ -1,0 +1,36 @@
+# NM Connect — override da stack LOCAL sem o WAHA.
+#
+# Mesmo papel do docker-compose.nm.yml, só que para o docker-compose.local.yml:
+# o NM Connect fala com o WhatsApp só pela Cloud API oficial da Meta, e o WAHA
+# (4 GB de imagem, ~370 MB de RAM) não precisa rodar na máquina de dev.
+#
+#   docker compose -f docker-compose.local.yml -f docker-compose.local.nm.yml \
+#     --env-file .env.local up -d
+#
+# Requer Docker Compose >= 2.24.4 (tags `!override` e `!reset`).
+# Detalhes e o que validar: docs/nm/sem-waha.md.
+
+services:
+  app:
+    environment:
+      # O local.yml fixa WAHA_API_BASE_URL=http://waha:3000, que vence o
+      # .env.local. Os valores abaixo são os do .env.nm.example: a URL aponta
+      # para um arquivo estático do próprio app, para o /api/v1/health não
+      # responder 503, e a chave é o placeholder que o código lê como
+      # "WAHA não configurado".
+      WAHA_API_BASE_URL: http://127.0.0.1:3000/rastreio/v1.js?sem-waha=
+      WAHA_API_KEY: dev_plaintext_change_me
+    # Sem isso o app espera um waha saudável que nunca sobe.
+    depends_on: !override
+      srh:
+        condition: service_started
+
+  worker:
+    # O worker só dependia do waha. Com http://waha:3000 sem resolver, o
+    # watchdog pula o tick de reconciliação, como em produção.
+    depends_on: !reset []
+
+  waha:
+    # Fora do `up` padrão. Para religar (plano B da demo, diagnóstico):
+    # COMPOSE_PROFILES=waha e tirar os dois valores de WAHA_* do app acima.
+    profiles: ["waha"]
