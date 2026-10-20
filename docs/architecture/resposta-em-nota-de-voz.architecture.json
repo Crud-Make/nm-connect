@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Resposta em nota de voz",
+    "subtitle": "Cliente mandou áudio, a IA responde em áudio — só depois de o texto passar por toda a cadeia before_send (migration 0677)",
+    "output": "resposta-em-nota-de-voz.html",
+    "quality_profile": "standard"
+  },
+  "lanes": [
+    { "id": "ui", "label": "Tela" },
+    { "id": "api", "label": "Rotas e canal" },
+    { "id": "data", "label": "Banco e Storage" },
+    { "id": "agent", "label": "Turno do agente" },
+    { "id": "ext", "label": "Fora do sistema" }
+  ],
+  "mainPath": ["entrada", "decisao", "preparo", "cadeia", "sintese", "guardar", "handler", "meta", "inbox"],
+  "nodes": [
+    { "id": "tela", "lane": "ui", "col": 1, "type": "frontend", "label": "Agente › Resposta em nota de voz (RespostaEmAudio.tsx)", "sublabel": "interruptor desligado por padrão · voz · tom" },
+    { "id": "versao", "lane": "data", "col": 1, "type": "database", "label": "ai_agent_versions.voice_reply_*", "sublabel": "imutável depois de publicada (fn_ai_agent_version_content_immutable)" },
+    { "id": "entrada", "lane": "data", "col": 2, "type": "database", "label": "messages (type = audio, inbound)", "sublabel": "a nota de voz que abriu o turno (inbound_message_id)" },
+    { "id": "decisao", "lane": "agent", "col": 2, "type": "service", "label": "decidirFormatoDaResposta (resposta-em-audio.ts)", "sublabel": "só inbound_turn · cliente escreveu = texto" },
+    { "id": "preparo", "lane": "agent", "col": 3, "type": "service", "label": "prepararRespostaEmAudio — chave OpenAI + teto, fora do lock", "sublabel": "resolveOrgLlmConfig(openai) · aplicarOrcamento" },
+    { "id": "cadeia", "lane": "agent", "col": 4, "type": "service", "label": "runBeforeSend (before-send.ts) — todos os gates", "sublabel": "opt-out · LGPD · janela · promessa · vocabulário · fato · disclosure" },
+    { "id": "sintese", "lane": "agent", "col": 5, "type": "service", "label": "gerarNotaDeVoz: textoParaFala + sintetizarFala", "sublabel": "só o finalBody aprovado · falha = mesmo texto como texto" },
+    { "id": "openai", "lane": "ext", "col": 5, "type": "external", "label": "OpenAI /v1/audio/speech (gpt-4o-mini-tts, opus)", "sublabel": "AbortSignal.timeout 20 s · resposta conferida como Ogg/Opus" },
+    { "id": "guardar", "lane": "data", "col": 5, "type": "database", "label": "storage whatsapp-media/<org>/<conversa>/voz-*.ogg", "sublabel": "retenção de mídia e exclusão LGPD do contato" },
+    { "id": "handler", "lane": "api", "col": 6, "type": "api", "label": "handler de mensagens (type audio, URL assinada curta)", "sublabel": "body = o texto falado" },
+    { "id": "meta", "lane": "ext", "col": 6, "type": "external", "label": "Meta Cloud API — audio { link, voice: true }", "sublabel": "uma bolha de voz por resposta" },
+    { "id": "llmcalls", "lane": "data", "col": 4, "type": "database", "label": "llm_calls (purpose resposta_em_audio)", "sublabel": "custo estimado pela duração · conta no teto mensal" },
+    { "id": "inbox", "lane": "ui", "col": 6, "type": "frontend", "label": "Inbox: player + texto falado (MediaRenderer)", "sublabel": "metadata.resposta_em_audio diz quando saiu texto e por quê" },
+    { "id": "uso", "lane": "ui", "col": 4, "type": "frontend", "label": "Uso de IA (/app/ai/usage) e Execuções (/app/ai/runs)" }
+  ],
+  "edges": [
+    { "id": "0", "from": "tela", "to": "versao", "label": "rascunho → publicar" },
+    { "id": "1", "from": "versao", "to": "decisao", "label": "agentConfig.voiceReply" },
+    { "id": "2", "from": "entrada", "to": "decisao", "label": "o tipo da mensagem do turno" },
+    { "id": "3", "from": "decisao", "to": "preparo", "label": "formato audio" },
+    { "id": "4", "from": "preparo", "to": "llmcalls", "label": "barrado pelo teto = linha orcamento_esgotado" },
+    { "id": "5", "from": "preparo", "to": "cadeia", "label": "antes do lock; sem chave/teto = texto" },
+    { "id": "6", "from": "cadeia", "to": "sintese", "label": "send(finalBody) — só o aprovado" },
+    { "id": "7", "from": "sintese", "to": "openai", "label": "texto falável + voz + instrução" },
+    { "id": "8", "from": "openai", "to": "sintese", "label": "Ogg/Opus" },
+    { "id": "9", "from": "sintese", "to": "guardar", "label": "upload" },
+    { "id": "10", "from": "guardar", "to": "handler", "label": "media_storage_path" },
+    { "id": "11", "from": "handler", "to": "meta", "label": "nota de voz" },
+    { "id": "12", "from": "handler", "to": "inbox", "label": "mensagem de áudio com o texto" },
+    { "id": "13", "from": "sintese", "to": "llmcalls", "label": "custo, gravado depois da cadeia" },
+    { "id": "14", "from": "llmcalls", "to": "uso", "label": "gasto do mês e falhas da voz" },
+    { "id": "15", "from": "sintese", "to": "handler", "label": "falhou = o mesmo texto aprovado, como texto" }
+  ]
+}

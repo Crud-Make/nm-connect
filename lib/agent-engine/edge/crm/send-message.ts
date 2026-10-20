@@ -62,7 +62,12 @@ export interface SendMessageInput {
    * colidirem no ledger e o segundo virar `already_sent` sem ter saído.
    */
   template?: { name: string; language: string; values: Record<string, string> };
-  /** Presente = imagem da pasta da conversa em `whatsapp-media`; `body` é a legenda. */
+  /**
+   * Presente = mídia da pasta da conversa em `whatsapp-media`. Imagem: `body` é
+   * a legenda. Áudio (`audio/*`, a resposta em nota de voz): `body` é o texto
+   * falado — a Meta não leva legenda em áudio, e a Inbox mostra o texto embaixo
+   * do player.
+   */
   media?: { storagePath: string; mime: string };
 }
 
@@ -86,7 +91,7 @@ export function corpoDoEnvio(
         }
       : input.media
         ? {
-            type: 'image' as const,
+            type: input.media.mime.startsWith('audio/') ? ('audio' as const) : ('image' as const),
             media_storage_path: input.media.storagePath,
             media_mime: input.media.mime,
           }

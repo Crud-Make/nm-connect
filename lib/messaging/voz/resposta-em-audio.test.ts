@@ -1,8 +1,15 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
+
+import { PONTOS_DE_IA } from "@/lib/ai/pontos/registro";
 
 import {
   coletarApelidosDeProcesso,
   decidirFormatoDaResposta,
+  instrucaoDeVoz,
+  PONTO_RESPOSTA_EM_AUDIO,
   gerarNotaDeVoz,
   prepararRespostaEmAudio,
   type VozPronta,
@@ -13,13 +20,23 @@ const ligado = { enabled: true, voice: "cedar", instructions: "Calma." };
 describe("decidirFormatoDaResposta — áudio responde áudio, texto responde texto", () => {
   it("cliente mandou nota de voz e o agente ligou: áudio", () => {
     expect(
-      decidirFormatoDaResposta({ config: ligado, tipoDaMensagemQueDisparou: "audio", jobKind: "inbound_turn", preview: false }),
+      decidirFormatoDaResposta({
+        config: ligado,
+        tipoDaMensagemQueDisparou: "audio",
+        jobKind: "inbound_turn",
+        preview: false,
+      }),
     ).toEqual({ formato: "audio", voz: "cedar", instrucoes: "Calma." });
   });
 
   it("cliente escreveu: texto, sem motivo (nada a registrar)", () => {
     expect(
-      decidirFormatoDaResposta({ config: ligado, tipoDaMensagemQueDisparou: "text", jobKind: "inbound_turn", preview: false }),
+      decidirFormatoDaResposta({
+        config: ligado,
+        tipoDaMensagemQueDisparou: "text",
+        jobKind: "inbound_turn",
+        preview: false,
+      }),
     ).toEqual({ formato: "texto", motivo: null });
   });
 
@@ -33,18 +50,33 @@ describe("decidirFormatoDaResposta — áudio responde áudio, texto responde te
       }),
     ).toEqual({ formato: "texto", motivo: null });
     expect(
-      decidirFormatoDaResposta({ config: null, tipoDaMensagemQueDisparou: "audio", jobKind: "inbound_turn", preview: false }),
+      decidirFormatoDaResposta({
+        config: null,
+        tipoDaMensagemQueDisparou: "audio",
+        jobKind: "inbound_turn",
+        preview: false,
+      }),
     ).toEqual({ formato: "texto", motivo: null });
   });
 
   it("follow-up, resposta a caso e prévia nunca viram áudio", () => {
     for (const jobKind of ["followup_turn", "case_reply_turn", null]) {
       expect(
-        decidirFormatoDaResposta({ config: ligado, tipoDaMensagemQueDisparou: "audio", jobKind, preview: false }).formato,
+        decidirFormatoDaResposta({
+          config: ligado,
+          tipoDaMensagemQueDisparou: "audio",
+          jobKind,
+          preview: false,
+        }).formato,
       ).toBe("texto");
     }
     expect(
-      decidirFormatoDaResposta({ config: ligado, tipoDaMensagemQueDisparou: "audio", jobKind: "inbound_turn", preview: true }).formato,
+      decidirFormatoDaResposta({
+        config: ligado,
+        tipoDaMensagemQueDisparou: "audio",
+        jobKind: "inbound_turn",
+        preview: true,
+      }).formato,
     ).toBe("texto");
   });
 });
@@ -75,7 +107,12 @@ describe("prepararRespostaEmAudio — chave e teto ANTES de qualquer envio", () 
       chaveOpenai: async () => ({ apiKey: "k", origemDaChave: "chave_da_instalacao" }),
       checarOrcamento: checar,
     });
-    expect(r.pronta).toEqual({ apiKey: "k", origemDaChave: "chave_da_instalacao", voz: "marin", instrucoes: "x" });
+    expect(r.pronta).toEqual({
+      apiKey: "k",
+      origemDaChave: "chave_da_instalacao",
+      voz: "marin",
+      instrucoes: "x",
+    });
     expect(checar).toHaveBeenCalledWith("chave_da_instalacao");
   });
 
@@ -91,7 +128,12 @@ describe("prepararRespostaEmAudio — chave e teto ANTES de qualquer envio", () 
   });
 });
 
-const pronta: VozPronta = { apiKey: "k", origemDaChave: "credencial_da_organizacao", voz: "marin", instrucoes: null };
+const pronta: VozPronta = {
+  apiKey: "k",
+  origemDaChave: "credencial_da_organizacao",
+  voz: "marin",
+  instrucoes: null,
+};
 
 describe("gerarNotaDeVoz — falha nunca é silêncio", () => {
   it("sintetiza o texto falável e guarda o Ogg", async () => {
@@ -103,9 +145,16 @@ describe("gerarNotaDeVoz — falha nunca é silêncio", () => {
       latenciaMs: 10,
     }));
     const guardar = vi.fn(async () => ({ ok: true as const, storagePath: "org/conv/voz-1.ogg" }));
-    const r = await gerarNotaDeVoz({ texto: "Sua audiência é em 15/03/2026.", pronta, sintetizar, guardar });
+    const r = await gerarNotaDeVoz({
+      texto: "Sua audiência é em 15/03/2026.",
+      pronta,
+      sintetizar,
+      guardar,
+    });
     expect(sintetizar).toHaveBeenCalledWith(
-      expect.objectContaining({ texto: "Sua audiência é em quinze de março de dois mil e vinte e seis." }),
+      expect.objectContaining({
+        texto: "Sua audiência é em quinze de março de dois mil e vinte e seis.",
+      }),
     );
     expect(r).toMatchObject({ ok: true, storagePath: "org/conv/voz-1.ogg", mime: "audio/ogg" });
     expect(r.chamada).toMatchObject({ ok: true, outputTokens: expect.any(Number) });
@@ -114,7 +163,12 @@ describe("gerarNotaDeVoz — falha nunca é silêncio", () => {
 
   it("texto que não se fala (link) volta como motivo, sem chamar a OpenAI", async () => {
     const sintetizar = vi.fn();
-    const r = await gerarNotaDeVoz({ texto: "Veja https://x.com", pronta, sintetizar, guardar: vi.fn() });
+    const r = await gerarNotaDeVoz({
+      texto: "Veja https://x.com",
+      pronta,
+      sintetizar,
+      guardar: vi.fn(),
+    });
     expect(r).toEqual({ ok: false, motivo: "link_na_resposta", chamada: null });
     expect(sintetizar).not.toHaveBeenCalled();
   });
@@ -123,18 +177,36 @@ describe("gerarNotaDeVoz — falha nunca é silêncio", () => {
     const r = await gerarNotaDeVoz({
       texto: "Oi, tudo bem?",
       pronta,
-      sintetizar: async () => ({ ok: false, motivo: "erro_da_api", status: 401, detalhe: "bad key", latenciaMs: 5 }),
+      sintetizar: async () => ({
+        ok: false,
+        motivo: "erro_da_api",
+        status: 401,
+        detalhe: "bad key",
+        latenciaMs: 5,
+      }),
       guardar: vi.fn(),
     });
     expect(r).toMatchObject({ ok: false, motivo: "erro_da_api" });
-    expect(r.chamada).toMatchObject({ ok: false, status: 401, inputTokens: 0, outputTokens: 0, costCents: 0 });
+    expect(r.chamada).toMatchObject({
+      ok: false,
+      status: 401,
+      inputTokens: 0,
+      outputTokens: 0,
+      costCents: 0,
+    });
   });
 
   it("áudio gerado mas não guardado: motivo, e o custo da síntese continua contado", async () => {
     const r = await gerarNotaDeVoz({
       texto: "Oi, tudo bem?",
       pronta,
-      sintetizar: async () => ({ ok: true, audio: new Uint8Array([1]), mime: "audio/ogg", duracaoSeg: 2, latenciaMs: 5 }),
+      sintetizar: async () => ({
+        ok: true,
+        audio: new Uint8Array([1]),
+        mime: "audio/ogg",
+        duracaoSeg: 2,
+        latenciaMs: 5,
+      }),
       guardar: async () => ({ ok: false, detalhe: "bucket fora" }),
     });
     expect(r).toMatchObject({ ok: false, motivo: "falha_ao_guardar" });
@@ -150,10 +222,21 @@ describe("coletarApelidosDeProcesso", () => {
       {
         ok: true,
         linhas: [
-          { numero_cnj: "0001234-56.2024.8.26.0100", apelido: "Aposentadoria por idade", fase: "perícia" },
+          {
+            numero_cnj: "0001234-56.2024.8.26.0100",
+            apelido: "Aposentadoria por idade",
+            fase: "perícia",
+          },
           { numero_cnj: "123", apelido: "inválido" },
         ],
-        content: [{ type: "text", text: JSON.stringify({ rows: [{ numero_cnj: "0009999-11.2023.5.02.0001", apelido: "Ação do Bruno" }] }) }],
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              rows: [{ numero_cnj: "0009999-11.2023.5.02.0001", apelido: "Ação do Bruno" }],
+            }),
+          },
+        ],
       },
       apelidos,
     );
@@ -161,5 +244,28 @@ describe("coletarApelidosDeProcesso", () => {
       ["0001234-56.2024.8.26.0100", "Aposentadoria por idade"],
       ["0009999-11.2023.5.02.0001", "Ação do Bruno"],
     ]);
+  });
+});
+
+describe("o ponto de IA da voz", () => {
+  it("está no registro (a tela de Provedores e Execuções o mostram) com o modelo que de fato roda", () => {
+    const ponto = PONTOS_DE_IA.find((p) => p.id === PONTO_RESPOSTA_EM_AUDIO);
+    expect(ponto?.fixo?.usa).toEqual({ provider: "openai", modelId: "gpt-4o-mini-tts" });
+    expect(ponto?.registraEm).toBe("llm_calls");
+  });
+
+  it("o turno grava o custo e consulta o teto com o MESMO id", () => {
+    const turno = readFileSync(
+      join(process.cwd(), "lib/agent-engine/agent/inbound-turn.ts"),
+      "utf8",
+    );
+    expect(turno.match(/purpose: 'resposta_em_audio'/g)?.length).toBe(2);
+  });
+
+  it("o sufixo do turno pede fala numa nota só, e só quando a resposta é áudio", () => {
+    expect(instrucaoDeVoz({ formato: "audio", voz: "marin", instrucoes: null })).toContain(
+      "única chamada de send_message",
+    );
+    expect(instrucaoDeVoz({ formato: "texto", motivo: null })).toBe("");
   });
 });

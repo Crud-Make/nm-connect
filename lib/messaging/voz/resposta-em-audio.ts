@@ -43,7 +43,8 @@ export type MotivoDoTexto =
   | MotivoDeNaoFalar
   | MotivoDaFalhaDaSintese
   | "falha_ao_guardar"
-  | "envio_do_audio_falhou";
+  | "envio_do_audio_falhou"
+  | "preparo_falhou";
 
 /** Frase curta de cada motivo, para o log do turno e a metadata da mensagem. */
 export const MOTIVOS_DO_TEXTO: Record<MotivoDoTexto, string> = {
@@ -59,6 +60,7 @@ export const MOTIVOS_DO_TEXTO: Record<MotivoDoTexto, string> = {
   formato_invalido: "a OpenAI devolveu um áudio que não é Ogg/Opus",
   falha_ao_guardar: "o áudio gerado não pôde ser guardado",
   envio_do_audio_falhou: "o canal recusou a nota de voz",
+  preparo_falhou: "não consegui conferir a chave ou o limite de gasto da voz",
 };
 
 /** O que a versão publicada do agente declara. `null` = sem versão publicada. */
@@ -106,7 +108,8 @@ export interface VozPronta {
   instrucoes: string | null;
 }
 
-export type Preparo = { pronta: VozPronta; motivo: null } | { pronta: null; motivo: MotivoDoTexto | null };
+export type Preparo =
+  { pronta: VozPronta; motivo: null } | { pronta: null; motivo: MotivoDoTexto | null };
 
 /**
  * Etapa 1, fora do lock. `checarOrcamento` recebe a origem da chave porque o
@@ -143,7 +146,13 @@ export interface ChamadaDeVoz {
 }
 
 export type NotaDeVoz =
-  | { ok: true; storagePath: string; mime: "audio/ogg"; duracaoSeg: number | null; chamada: ChamadaDeVoz }
+  | {
+      ok: true;
+      storagePath: string;
+      mime: "audio/ogg";
+      duracaoSeg: number | null;
+      chamada: ChamadaDeVoz;
+    }
   | { ok: false; motivo: MotivoDoTexto; chamada: ChamadaDeVoz | null };
 
 /**
@@ -160,7 +169,10 @@ export async function gerarNotaDeVoz(d: {
     voz: VozDeFala;
     instrucoes: string | null;
   }) => Promise<ResultadoDaSintese>;
-  guardar: (audio: Uint8Array, mime: "audio/ogg") => Promise<{ ok: true; storagePath: string } | { ok: false; detalhe: string }>;
+  guardar: (
+    audio: Uint8Array,
+    mime: "audio/ogg",
+  ) => Promise<{ ok: true; storagePath: string } | { ok: false; detalhe: string }>;
 }): Promise<NotaDeVoz> {
   const falavel = textoParaFala(d.texto, d.apelidos ? { apelidos: d.apelidos } : {});
   if (!falavel.ok) return { ok: false, motivo: falavel.motivo, chamada: null };
@@ -187,7 +199,10 @@ export async function gerarNotaDeVoz(d: {
       },
     };
   }
-  const custo = custoDaSintese({ caracteres: falavel.texto.length, duracaoSeg: sintese.duracaoSeg });
+  const custo = custoDaSintese({
+    caracteres: falavel.texto.length,
+    duracaoSeg: sintese.duracaoSeg,
+  });
   const chamada: ChamadaDeVoz = {
     ok: true,
     model: MODELO_DE_FALA,
@@ -199,7 +214,13 @@ export async function gerarNotaDeVoz(d: {
   const guardado = await d.guardar(sintese.audio, sintese.mime);
   // Gerado e não guardado: a OpenAI já cobrou, então o custo continua contado.
   if (!guardado.ok) return { ok: false, motivo: "falha_ao_guardar", chamada };
-  return { ok: true, storagePath: guardado.storagePath, mime: sintese.mime, duracaoSeg: sintese.duracaoSeg, chamada };
+  return {
+    ok: true,
+    storagePath: guardado.storagePath,
+    mime: sintese.mime,
+    duracaoSeg: sintese.duracaoSeg,
+    chamada,
+  };
 }
 
 // ─── apelidos de processo colhidos no turno ─────────────────────────────────
@@ -212,7 +233,11 @@ const CNJ_EXATO = /^\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}$/;
  * `numero_cnj` + `apelido` — as colunas da visão `ia.processos`
  * (`infra/nm-processos/001_base.sql`). Nunca lança.
  */
-export function coletarApelidosDeProcesso(resultado: unknown, destino: Map<string, string>, profundidade = 0): void {
+export function coletarApelidosDeProcesso(
+  resultado: unknown,
+  destino: Map<string, string>,
+  profundidade = 0,
+): void {
   if (profundidade > 8 || resultado === null || resultado === undefined) return;
   if (typeof resultado === "string") {
     const t = resultado.trim();
@@ -233,7 +258,12 @@ export function coletarApelidosDeProcesso(resultado: unknown, destino: Map<strin
   const obj = resultado as Record<string, unknown>;
   const cnj = obj.numero_cnj;
   const apelido = obj.apelido;
-  if (typeof cnj === "string" && CNJ_EXATO.test(cnj) && typeof apelido === "string" && apelido.trim() !== "") {
+  if (
+    typeof cnj === "string" &&
+    CNJ_EXATO.test(cnj) &&
+    typeof apelido === "string" &&
+    apelido.trim() !== ""
+  ) {
     destino.set(cnj, apelido.trim());
   }
   for (const valor of Object.values(obj)) {
@@ -241,4 +271,19 @@ export function coletarApelidosDeProcesso(resultado: unknown, destino: Map<strin
       coletarApelidosDeProcesso(valor, destino, profundidade + 1);
     }
   }
+}
+
+/**
+ * O sufixo do turno quando a resposta vai virar voz. Não muda o que o agente
+ * pode dizer — só pede a forma que se fala bem, para a normalização ter pouco a
+ * consertar e a resposta caber numa nota só.
+ */
+export function instrucaoDeVoz(decisao: DecisaoDoFormato): string {
+  if (decisao.formato !== "audio") return "";
+  return (
+    "## Esta resposta vira nota de voz\n" +
+    "O cliente mandou uma nota de voz, e a sua resposta vai ser FALADA para ele. Escreva como se fala: " +
+    "frases curtas, sem listas, sem emoji e sem formatação, tudo numa única chamada de send_message. " +
+    "Se a resposta precisar de um link, ela sai por escrito."
+  );
 }
