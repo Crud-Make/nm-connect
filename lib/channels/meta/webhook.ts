@@ -19,6 +19,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { parseMetaInboundContact } from "@/lib/channels/meta/contact-card";
 import type { SharedContact } from "@/lib/messaging/contact-card";
+import { bsuidOuNull } from "./bsuid";
 import type { MetaWebhookEnvelope } from "./envelope";
 
 /** Assinatura da Meta: `sha256=<hex>` no header `X-Hub-Signature-256`. */
@@ -127,8 +128,28 @@ export interface InboundMessageEvent {
    * `wa_id` do contato. **Pode vir sem o nono dígito** em celular brasileiro
    * (medido: 553198966398 para quem recebemos como 5531998966398) — quem resolve o
    * contato TEM de usar `phoneLookupVariants`, senão duplica a pessoa.
+   *
+   * **`null` quando a Meta omite o telefone** (usuário com username, sem
+   * conversa com este número nos últimos 30 dias e sem o número da empresa nos
+   * contatos). Aí a identidade é `fromUserId` — o parser garante que pelo menos
+   * um dos dois existe, senão o evento é `inbound_sem_identidade`.
    */
-  from: string;
+  from: string | null;
+  /**
+   * BSUID (`messages[].from_user_id`) — ver `./bsuid.ts`. Só nasce quando a
+   * Meta manda: sem ele o evento é idêntico ao de antes dos usernames.
+   */
+  fromUserId?: string;
+  /** `contacts[].profile.username`, quando a pessoa adotou username. */
+  username?: string;
+  /**
+   * O telefone que a pessoa compartilhou TOCANDO no botão REQUEST_CONTACT_INFO
+   * (`type: "contacts"` com `origin: "contact_request"`), em dígitos como o
+   * `wa_id`. É o caminho documentado para o telefone de quem chegou só por
+   * BSUID: a ingestão o junta ao contato. Cartão compartilhado à mão
+   * (`origin: "other"`) NÃO entra — pode ser o número de outra pessoa.
+   */
+  telefoneInformado?: string;
   profileName: string | null;
   sentAt: Date;
   /** `text` | `audio` | `image` | `video` | `document` | `sticker` | `contact` | … */
@@ -167,6 +188,13 @@ export interface MessageStatusEvent {
   externalId: string;
   status: string;
   recipient: string | null;
+  /**
+   * BSUID do destinatário (`statuses[].recipient_user_id`). Vem em todo status
+   * menos no `failed` de mensagem enviada por telefone. Quem grava casa a
+   * linha pelo `wamid`, então hoje é só informação — mas um status de envio
+   * por BSUID vem com `recipient_id` OMITIDO, e o evento não pode depender dele.
+   */
+  recipientUserId?: string;
   errorCode: number | null;
   errorTitle: string | null;
   /**
@@ -195,8 +223,15 @@ export interface OutboundEchoEvent {
   phoneNumberId: string;
   /** `wamid` — mesma chave de idempotência das mensagens recebidas. */
   externalId: string;
-  /** `wa_id` do CLIENTE (o destinatário). Mesma ressalva do nono dígito. */
-  to: string;
+  /**
+   * `wa_id` do CLIENTE (o destinatário). Mesma ressalva do nono dígito. `null`
+   * quando a Meta omite o telefone de quem usa username — aí vale `toUserId`.
+   */
+  to: string | null;
+  /** BSUID do destinatário (`message_echoes[].to_user_id`). */
+  toUserId?: string;
+  /** `contacts[].profile.username` do destinatário, quando houver. */
+  username?: string;
   sentAt: Date;
   /** `text` | `image` | `video` | `document` | `contact` | … */
   type: string;
@@ -239,10 +274,29 @@ export interface AppContactSyncEvent {
   action: string;
 }
 
+/**
+ * Mensagem recebida que chegou SEM telefone E sem BSUID — nenhuma identidade
+ * para criar contato ou responder.
+ *
+ * Não vira linha em `messages` (não há de quem ela é), mas também não some
+ * calada como sumia: quem processa o webhook escreve log estruturado e abre
+ * aviso na Central (`./sem-identidade.ts`). É o único evento deste parser que
+ * existe para ser VISTO, não gravado.
+ */
+export interface InboundSemIdentidadeEvent {
+  kind: "inbound_sem_identidade";
+  wabaId: string;
+  phoneNumberId: string;
+  /** `wamid` — para quem for conferir no celular do número qual foi. */
+  externalId: string;
+  type: string;
+}
+
 export type MetaWebhookEvent =
   | TemplateStatusEvent
   | MessageStatusEvent
   | InboundMessageEvent
+  | InboundSemIdentidadeEvent
   | OutboundEchoEvent
   | AppContactSyncEvent;
 
@@ -269,6 +323,43 @@ export function normalizeRejectedReason(v: unknown): string | null {
 
 function str(v: unknown): string | null {
   return typeof v === "string" && v.length > 0 ? v : null;
+}
+
+/**
+ * O bloco `contacts[]` de quem mandou (ou recebeu): casa pelo telefone OU pelo
+ * BSUID. Quem chega só por BSUID não tem `wa_id` no bloco, e procurar só por
+ * ele deixava o nome e o username de fora.
+ */
+function perfilDe(
+  contatos: Record<string, unknown>[],
+  telefone: string | null,
+  bsuid: string | null,
+): Record<string, unknown> | undefined {
+  return contatos.find(
+    (c) =>
+      (telefone !== null && str(c.wa_id) === telefone) ||
+      (bsuid !== null && str(c.user_id) === bsuid),
+  );
+}
+
+/** `profile.username` de um bloco de contato, ou `null`. */
+function usernameDe(perfil: Record<string, unknown> | undefined): string | null {
+  return str((perfil?.profile as Record<string, unknown> | undefined)?.username);
+}
+
+/**
+ * O telefone do cartão que a pessoa mandou TOCANDO no botão de pedido de
+ * contato — e só nesse caso (ver `InboundMessageEvent.telefoneInformado`).
+ */
+function telefoneDoPedidoDeContato(raw: Record<string, unknown>): string | null {
+  const cartoes = Array.isArray(raw.contacts) ? (raw.contacts as Record<string, unknown>[]) : [];
+  const cartao = cartoes[0];
+  if (!cartao || str(cartao.origin) !== "contact_request") return null;
+  const fones = Array.isArray(cartao.phones) ? (cartao.phones as Record<string, unknown>[]) : [];
+  const fone = fones[0];
+  const bruto = str(fone?.wa_id) ?? str(fone?.phone);
+  const digitos = bruto ? bruto.replace(/\D/g, "") : "";
+  return digitos.length >= 8 ? digitos : null;
 }
 
 /** Rótulo do botão tocado: `button.text` (modelo) ou `interactive.button_reply|list_reply.title`. */
@@ -319,11 +410,29 @@ export function parseMetaWebhook(envelope: MetaWebhookEnvelope): MetaWebhookEven
         const contatos = Array.isArray(v.contacts) ? (v.contacts as Record<string, unknown>[]) : [];
         for (const raw of v.messages as Record<string, unknown>[]) {
           const id = str(raw.id);
+          if (!id) continue; // sem `wamid` não há o que gravar nem o que nomear
+          // `from` omitido (ou `""`, no formato antigo da doc) = usuário com
+          // username que a Meta não identifica por telefone. A identidade passa
+          // a ser o BSUID; sem os DOIS, a mensagem não vira linha — mas vira
+          // evento, para alguém ver (ver `InboundSemIdentidadeEvent`).
           const from = str(raw.from);
-          if (!id || !from) continue; // payload capenga não vira linha meia-boca
-
-          const perfil = contatos.find((c) => str(c.wa_id) === from);
+          const fromUserId = bsuidOuNull(raw.from_user_id);
           const tipo = str(raw.type) ?? "unknown";
+          if (!from && !fromUserId) {
+            out.push({
+              kind: "inbound_sem_identidade",
+              wabaId,
+              phoneNumberId: str(meta.phone_number_id) ?? "",
+              externalId: id,
+              type: tipo,
+            });
+            continue;
+          }
+
+          const perfil = perfilDe(contatos, from, fromUserId);
+          const username = usernameDe(perfil);
+          const telefoneInformado =
+            tipo === "contacts" ? telefoneDoPedidoDeContato(raw) : null;
           // Toque num botão de modelo chega como `button`, e numa resposta interativa como
           // `interactive`: nenhum dos dois cabe no CHECK de `messages.type`, e gravá-los crus
           // fazia o insert falhar — a resposta do contato sumia do CRM. Entram como texto,
@@ -340,6 +449,10 @@ export function parseMetaWebhook(envelope: MetaWebhookEnvelope): MetaWebhookEven
             phoneNumberId: str(meta.phone_number_id) ?? "",
             externalId: id,
             from,
+            // Só nascem quando existem: um evento sem BSUID é idêntico ao de antes.
+            ...(fromUserId ? { fromUserId } : {}),
+            ...(username ? { username } : {}),
+            ...(telefoneInformado ? { telefoneInformado } : {}),
             profileName: str((perfil?.profile as Record<string, unknown> | undefined)?.name),
             // A Meta manda epoch em SEGUNDOS, string. Passar direto ao Date daria 1970.
             sentAt: new Date(Number(str(raw.timestamp) ?? "0") * 1000),
@@ -376,12 +489,14 @@ export function parseMetaWebhook(envelope: MetaWebhookEnvelope): MetaWebhookEven
             ? (raw.errors as Record<string, unknown>[])
             : [];
           const first = errors[0] ?? {};
+          const recipientUserId = bsuidOuNull(raw.recipient_user_id);
           out.push({
             kind: "message_status",
             wabaId,
             externalId: id,
             status: str(raw.status) ?? "unknown",
             recipient: str(raw.recipient_id),
+            ...(recipientUserId ? { recipientUserId } : {}),
             errorCode: typeof first.code === "number" ? first.code : null,
             errorTitle: str(first.title),
             occurredAt: epochEmSegundos(raw.timestamp),
@@ -391,11 +506,18 @@ export function parseMetaWebhook(envelope: MetaWebhookEnvelope): MetaWebhookEven
       // Coexistência: o que a empresa enviou pelo app WhatsApp Business.
       if (change.field === "smb_message_echoes" && Array.isArray(v.message_echoes)) {
         const meta = (v.metadata ?? {}) as Record<string, unknown>;
+        const contatos = Array.isArray(v.contacts) ? (v.contacts as Record<string, unknown>[]) : [];
         for (const raw of v.message_echoes as Record<string, unknown>[]) {
           const id = str(raw.id);
+          // `to` omitido = cliente com username; o BSUID (`to_user_id`) basta.
           const to = str(raw.to);
+          const toUserId = bsuidOuNull(raw.to_user_id);
           const tipo = str(raw.type) ?? "unknown";
-          if (!id || !to) continue; // payload capenga não vira linha meia-boca
+          // Eco sem destinatário nenhum: quem respondeu foi a equipe, pelo app —
+          // a mensagem está no celular de quem a escreveu, nada se perde do
+          // cliente. Por isso não abre aviso, ao contrário da recebida.
+          if (!id || (!to && !toUserId)) continue;
+          const username = usernameDe(perfilDe(contatos, to, toUserId));
           if (tipo === "revoke" || tipo === "edit") continue; // ver `OutboundEchoEvent`
 
           // Cartão chega como `contacts`, que o CHECK de `messages.type` recusa —
@@ -409,6 +531,8 @@ export function parseMetaWebhook(envelope: MetaWebhookEnvelope): MetaWebhookEven
             phoneNumberId: str(meta.phone_number_id) ?? "",
             externalId: id,
             to,
+            ...(toUserId ? { toUserId } : {}),
+            ...(username ? { username } : {}),
             sentAt: new Date(Number(str(raw.timestamp) ?? "0") * 1000),
             type: tipoCrm,
             // Texto do balão: o corpo, o nome do cartão, ou a legenda da mídia.
