@@ -104,8 +104,8 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
   {
     fn: "fn_processos_andamento_aprovar(uuid,uuid)",
     razao:
-      "SEM call site ainda, e declarado: as rotas de andamento do módulo processos são o PR 2 " +
-      "(a migration 0707 é o PR 1, só banco). Concedida a authenticated já agora porque é a " +
+      "POST app/api/v1/processos/andamentos/[id]/aprovar/route.ts usa createClient da sessão, " +
+      "depois de requireRole('manager'). Concedida a authenticated porque é a " +
       "ÚNICA porta de aprovar: a RLS de andamentos fecha para a sessão o UPDATE de aprovado e a " +
       "transição para aprovado. Definer porque grava quem aprovou, quando e o sha256 do texto da " +
       "linha travada (FOR UPDATE), que o CHECK andamentos_aprovacao_coerente exige. Recusa sem " +
@@ -115,7 +115,8 @@ const AUTHENTICATED_PERMITIDO: readonly Excecao[] = [
   {
     fn: "fn_processos_andamento_editar(uuid,uuid,text)",
     razao:
-      "SEM call site ainda, e declarado: chega com as rotas do PR 2 do módulo processos. É a " +
+      "PATCH app/api/v1/processos/andamentos/[id]/route.ts usa createClient da sessão, depois " +
+      "de requireRole('agent'). É a " +
       "única porta de reescrever um andamento APROVADO — a RLS só deixa a sessão escrever " +
       "rascunho — e a escrita devolve a rascunho zerando a aprovação na mesma linha, o desfecho " +
       "que o CHECK andamentos_aprovacao_coerente obriga. Recusa sem auth.uid() e exige " +

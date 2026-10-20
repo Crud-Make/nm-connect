@@ -61,7 +61,11 @@ relatar() {
     local aqui="${linha%%|*}" la="${linha#*|}"
     echo "  $aqui  =  $la"
     # Anotação no PR quando roda no GitHub Actions.
-    [[ -n "${GITHUB_ACTIONS:-}" ]] && echo "::$nivel file=${aqui%%:*}::trecho repetido com $la (jscpd, ≥$MIN_TOKENS tokens)"
+    # `if`, e não `[[ ]] &&`: fora do Actions o teste falso viraria o status da função, e o
+    # `set -e` encerrava o script depois do primeiro relato, sem chegar ao veredito.
+    if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
+      echo "::$nivel file=${aqui%%:*}::trecho repetido com $la (jscpd, ≥$MIN_TOKENS tokens)"
+    fi
   done
 }
 

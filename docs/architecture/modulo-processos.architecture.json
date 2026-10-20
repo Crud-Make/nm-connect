@@ -1,13 +1,14 @@
 {
   "schema_version": 1,
   "diagram_type": "architecture",
-  "meta": { "title": "Módulo Processos (advocacia) — banco e trava", "subtitle": "PR 1: as tabelas nascem na instalação do módulo, o andamento aprovado é o texto aprovado (hash no CHECK), e a trava do CPF confere também pelo cadastro do contato. Rotas e telas (PR 2) e a ferramenta da IA (PR 3) ainda não existem", "output": "modulo-processos.html", "quality_profile": "standard" },
+  "meta": { "title": "Módulo Processos (advocacia) — banco, rotas e telas", "subtitle": "PR 1: as tabelas nascem na instalação do módulo, o andamento aprovado é o texto aprovado (hash no CHECK), e a trava do CPF confere também pelo cadastro do contato. PR 2: rotas /api/v1/processos, a lista /app/processos e o painel na ficha do contato. A ferramenta da IA (PR 3) ainda não existe", "output": "modulo-processos.html", "quality_profile": "standard" },
   "lanes": [
     { "id": "operador", "label": "Administração" },
+    { "id": "tela", "label": "Tela do operador" },
     { "id": "servidor", "label": "Servidor" },
     { "id": "banco", "label": "Persistência" }
   ],
-  "mainPath": ["adminModulos", "instalar", "provisionadora", "processos", "andamentos", "aprovar"],
+  "mainPath": ["adminModulos", "instalar", "provisionadora", "navProcessos", "listaProcessos", "painelFicha", "rotasProcessos", "rotasAndamento", "aprovar"],
   "nodes": [
     { "id": "adminModulos", "lane": "operador", "col": 1, "type": "frontend", "label": "Admin › Módulos — catálogo lib/modulos/catalogo.ts (slug processos)" },
     { "id": "instalar", "lane": "banco", "col": 2, "type": "database", "label": "fn_modulo_instalar / fn_reaplicar_modulos_instalados (modulos_instalados)" },
@@ -22,7 +23,13 @@
     { "id": "verificacoes", "lane": "banco", "col": 6, "type": "database", "label": "verificacoes_de_identidade — connection_id nulo = cadastro (nulls not distinct)" },
     { "id": "trava", "lane": "servidor", "col": 5, "type": "lib", "label": "conferencia-de-cpf.ts (conferirCpfDoContato) + conferencia-de-identidade.ts (concluirConferencia, recusaPelaTravaDoCpf)" },
     { "id": "dadosExternos", "lane": "servidor", "col": 6, "type": "service", "label": "crm_query_external_data / crm_confirm_customer_identity (banco externo, mesma trava)" },
-    { "id": "central", "lane": "operador", "col": 6, "type": "frontend", "label": "Central de avisos — handoff ao bloquear a conferência" }
+    { "id": "central", "lane": "operador", "col": 6, "type": "frontend", "label": "Central de avisos — handoff ao bloquear a conferência" },
+    { "id": "navProcessos", "lane": "tela", "col": 1, "type": "frontend", "label": "Análise › Ver tudo em Análise › Processos — lib/navigation/catalogo.ts (modulo: processos)" },
+    { "id": "listaProcessos", "lane": "tela", "col": 2, "type": "frontend", "label": "/app/processos — layout com gate moduloLigado + lista (apelido, CNJ, cliente, fase)" },
+    { "id": "painelFicha", "lane": "tela", "col": 3, "type": "frontend", "label": "Ficha do contato — ProcessosDoContato / AndamentosDoProcesso (cadastrar, lançar, editar, Aprovar manager+)" },
+    { "id": "rotasProcessos", "lane": "servidor", "col": 3, "type": "service", "label": "GET/POST /api/v1/processos (viewer/agent) e /processos/[id]/andamentos (viewer/agent)" },
+    { "id": "rotasAndamento", "lane": "servidor", "col": 4, "type": "service", "label": "PATCH /processos/andamentos/[id] (agent) e POST …/aprovar (manager) — pelas RPCs" },
+    { "id": "auditoria", "lane": "banco", "col": 2, "type": "database", "label": "api_audit_log — processo.criado, andamento.criado/editado/aprovado (só ids)" }
   ],
   "edges": [
     { "id": "e1", "from": "adminModulos", "to": "instalar", "label": "instalar o módulo (recibo idempotente)" },
@@ -41,6 +48,16 @@
     { "id": "e14", "from": "trava", "to": "conferirCpf", "label": "rpc com os 3 dígitos" },
     { "id": "e15", "from": "trava", "to": "verificacoes", "label": "lê e grava a tentativa (conexão ou nula)" },
     { "id": "e16", "from": "trava", "to": "central", "label": "3 erros: bloqueio + aviso" },
-    { "id": "e17", "from": "dadosExternos", "to": "trava", "label": "recusa sem conferência / cauda da conferência" }
+    { "id": "e17", "from": "dadosExternos", "to": "trava", "label": "recusa sem conferência / cauda da conferência" },
+    { "id": "e18", "from": "navProcessos", "to": "listaProcessos", "label": "porta só com o módulo instalado" },
+    { "id": "e19", "from": "listaProcessos", "to": "painelFicha", "label": "cada linha leva à ficha do cliente" },
+    { "id": "e20", "from": "listaProcessos", "to": "rotasProcessos", "label": "GET sem contact_id" },
+    { "id": "e21", "from": "painelFicha", "to": "rotasProcessos", "label": "GET ?contact_id, POST processo e andamento" },
+    { "id": "e22", "from": "painelFicha", "to": "rotasAndamento", "label": "editar rascunho / Aprovar" },
+    { "id": "e23", "from": "rotasProcessos", "to": "processos", "label": "client de sessão (RLS), organization_id explícito" },
+    { "id": "e24", "from": "rotasProcessos", "to": "andamentos", "label": "rascunho com criado_por" },
+    { "id": "e25", "from": "rotasAndamento", "to": "aprovar", "label": "rpc com p_org da sessão" },
+    { "id": "e26", "from": "rotasProcessos", "to": "auditoria", "label": "processo.criado / andamento.criado" },
+    { "id": "e27", "from": "rotasAndamento", "to": "auditoria", "label": "andamento.editado / andamento.aprovado" }
   ]
 }

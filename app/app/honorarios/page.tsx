@@ -1,8 +1,6 @@
-import { redirect } from "next/navigation";
-
-import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { PaginaDeModulo } from "@/components/layout/PaginaDeModulo";
+import { exigirOrgDaPagina } from "@/lib/auth/org-da-pagina";
 import { ROLE_RANK } from "@/lib/auth/types";
-import { traduzir } from "@/lib/i18n/dicionario";
 
 import { Honorarios } from "./_client";
 
@@ -17,21 +15,14 @@ export const dynamic = "force-dynamic";
  * catálogo financeiro e da migration 0480.
  */
 export default async function Page() {
-  const user = await requireAuth();
-  const org = await resolveActiveOrg(user);
-  if (!org) redirect("/app");
-
-  const t = (texto: string) => traduzir(texto, user.idioma);
+  const { org, t } = await exigirOrgDaPagina();
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold">{t("Honorários")}</h1>
-        <p className="text-sm text-text-muted">
-          {t("O modelo de cobrança de cada caso e o calendário de parcelas.")}
-        </p>
-      </div>
+    <PaginaDeModulo
+      titulo={t("Honorários")}
+      descricao={t("O modelo de cobrança de cada caso e o calendário de parcelas.")}
+    >
       <Honorarios podeGerenciar={ROLE_RANK[org.role] >= ROLE_RANK.manager} />
-    </div>
+    </PaginaDeModulo>
   );
 }

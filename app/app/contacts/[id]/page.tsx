@@ -1,6 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { requireAuth, resolveActiveOrg } from "@/lib/auth/server";
+import { moduloLigado } from "@/lib/instalacao/modulos";
 import { paineisDaEntidade } from "@/lib/modulos/dados/paineis";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { ContactDetailClient } from "./_client";
 
@@ -32,5 +34,14 @@ export default async function ContactDetailPage({
   // A organização vem da SESSÃO (`resolveActiveOrg`, acima), nunca da URL: é ela que decide se
   // esta empresa chega a saber que o módulo existe. Ver o cabeçalho de `paineisDaEntidade`.
   const paineisDeModulo = await paineisDaEntidade("contato", activeOrg.orgId);
-  return <ContactDetailClient contactId={id} paineisDeModulo={paineisDeModulo} />;
+  // Módulo de TABELA (ADR-0002): decidido aqui, como o layout de `/app/processos`. Sem ele as
+  // tabelas não existem, e o painel nem é montado — o client não consulta o módulo.
+  const processosAtivo = await moduloLigado(createAdminClient(), "processos");
+  return (
+    <ContactDetailClient
+      contactId={id}
+      paineisDeModulo={paineisDeModulo}
+      processosAtivo={processosAtivo}
+    />
+  );
 }
