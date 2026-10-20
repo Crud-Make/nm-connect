@@ -28,6 +28,10 @@
  * segue o gravado em c85293f05: o payload brasileiro é comparado a ele SEM
  * essas duas chaves (`semAsChavesDoDoc110`), o que prova que nenhuma outra
  * mudou, e um caso à parte cobra que as duas estão lá.
+ *
+ * Quarta exceção deliberada: `data-*.json` ganharam `processos`, `andamentos` e
+ * `andamentos_da_equipe`, vazios, logo depois de `honorarios_parcelas` — as
+ * seções do módulo Processos no export (PR 3 do módulo). Nenhuma outra chave mudou.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
