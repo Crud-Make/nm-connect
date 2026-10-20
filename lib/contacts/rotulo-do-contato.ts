@@ -32,10 +32,27 @@ export interface ContatoNomeavel {
   display_name?: string | null;
   name?: string | null;
   phone_number?: string | null;
+  /**
+   * Username do WhatsApp (`contacts.wa_username`, migration 0678). Rótulo de
+   * quem chegou pelo canal oficial com username e SEM telefone.
+   */
+  wa_username?: string | null;
+  /**
+   * BSUID (`contacts.wa_bsuid`). Nunca aparece na tela — é id de máquina —, mas
+   * diz que o contato existe sem telefone, e o rótulo admite isso.
+   */
+  wa_bsuid?: string | null;
 }
 
 /** Quando não há nada apresentável. Um literal, não quatro. */
 export const SEM_NOME = "Sem nome";
+
+/**
+ * Quando a pessoa chegou pelo WhatsApp oficial só com o BSUID (usa username,
+ * e a Meta não mandou o telefone) e nem nome nem username vieram. Diz o que
+ * falta — e o que o atendente pode pedir —, em vez de "Sem nome".
+ */
+export const SEM_TELEFONE = "Cliente sem telefone";
 
 /**
  * Cheira a identificador de máquina?
@@ -112,8 +129,9 @@ export function nomeDoContato(c: ContatoNomeavel | null | undefined): string | n
 }
 
 /**
- * O rótulo. O nome de gente (`nomeDoContato`), depois o número — e só então a
- * admissão de que não se sabe o nome.
+ * O rótulo. O nome de gente (`nomeDoContato`), depois o número, depois o
+ * @username de quem chegou sem telefone — e só então a admissão de que não se
+ * sabe o nome.
  *
  * Celular BR aparece COM o nono dígito: `+553284793302` e `+5532984793302` são
  * a mesma pessoa, e o 9 é o que o atendente espera copiar.
@@ -129,6 +147,12 @@ export function rotuloDoContato(
 
   const tel = (c.phone_number ?? "").trim();
   if (tel !== "") return phoneForDisplay(tel);
+
+  // Sem telefone: o @username é como a pessoa aparece no próprio WhatsApp. O
+  // BSUID nunca vai para a tela (é id de máquina — a regra do topo).
+  const username = (c.wa_username ?? "").trim().replace(/^@+/, "");
+  if (username !== "") return `@${username}`;
+  if ((c.wa_bsuid ?? "").trim() !== "") return t(SEM_TELEFONE);
 
   return t(SEM_NOME);
 }

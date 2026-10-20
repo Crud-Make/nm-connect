@@ -93,7 +93,8 @@ const COR_DO_COMANDO: Record<string, string> = {
 };
 
 function initials(name: string | null | undefined, fallback: string): string {
-  const v = (name ?? "").trim();
+  // `@username` (contato sem telefone): a inicial é a do nome, não o `@`.
+  const v = (name ?? "").trim().replace(/^@+/, "");
   if (!v) return fallback.slice(0, 2).toUpperCase();
   const parts = v.split(/\s+/).filter(Boolean);
   if (parts.length === 0) return fallback.slice(0, 2).toUpperCase();

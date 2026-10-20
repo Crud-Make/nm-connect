@@ -109,3 +109,36 @@ describe("ConversationListItem — setor", () => {
     expect(screen.queryByTitle(/^Setor /)).toBeNull();
   });
 });
+
+/**
+ * Quem chegou pelo WhatsApp oficial com username, sem telefone (migration
+ * 0678). A linha da lista não pode cair em "Sem nome" nem mostrar o BSUID
+ * cru: o @username é como a pessoa aparece no WhatsApp dela.
+ */
+describe("ConversationListItem — contato sem telefone (username do WhatsApp)", () => {
+  const semTelefone = (extra: Record<string, unknown>) => ({
+    ...conversaDeExemplo.conversation,
+    contacts: {
+      ...conversaDeExemplo.conversation.contacts!,
+      name: null,
+      display_name: null,
+      phone_number: null,
+      wa_bsuid: "US.13491208655302741918",
+      ...extra,
+    },
+  });
+
+  it("mostra o @username", () => {
+    render(
+      <ConversationListItem conversation={semTelefone({ wa_username: "realsheenanelson" })} {...conversaDeExemplo.props} />,
+    );
+    expect(screen.getByText("@realsheenanelson")).toBeInTheDocument();
+    expect(screen.queryByText("US.13491208655302741918")).toBeNull();
+  });
+
+  it("sem username: 'Cliente sem telefone', nunca o BSUID", () => {
+    render(<ConversationListItem conversation={semTelefone({ wa_username: null })} {...conversaDeExemplo.props} />);
+    expect(screen.getByText("Cliente sem telefone")).toBeInTheDocument();
+    expect(screen.queryByText(/US\.1349/)).toBeNull();
+  });
+});

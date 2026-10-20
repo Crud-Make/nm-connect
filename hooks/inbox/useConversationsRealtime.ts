@@ -18,6 +18,13 @@ export interface ContactSummary {
   display_name: string | null;
   name: string | null;
   phone_number: string | null;
+  /**
+   * Quem chegou pelo WhatsApp oficial com username pode não ter telefone
+   * (migration 0678): o rótulo cai no @username ou em "Cliente sem telefone"
+   * (`rotuloDoContato`). Opcionais: conversas em cache de antes do campo.
+   */
+  wa_username?: string | null;
+  wa_bsuid?: string | null;
   tags: string[];
   is_blocked: boolean;
   is_anonymized: boolean;

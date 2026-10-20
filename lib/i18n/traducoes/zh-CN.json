@@ -2796,6 +2796,7 @@
   "Selecione uma conversa para visualizar": "选择要查看的会话",
   "Modo somente-leitura. Use “Impersonate” para responder como atendente do tenant.": "只读模式。使用“Impersonate”以租户客服身份回复。",
   "Sem nome": "未命名",
+  "Cliente sem telefone": "无电话号码的客户",
   "Buscar mensagem...": "搜索消息...",
   "Falha ao carregar conversas.": "加载会话失败。",
   "Nenhuma conversa encontrada.": "未找到会话。",
