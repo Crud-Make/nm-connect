@@ -157,14 +157,20 @@ describe("credencial de enfeite não derruba a leitura (#754)", () => {
     // apêndice de migration — continua reprovando com o mesmo motivo de sempre:
     // cifra nova, guarda nova. A lista de donos não encolhe sozinha: só entra
     // aqui quem passa no item 6.
-    const donas = [...DEFINICOES_BASELINE, ...definicoesDeFuncao(BASELINE, "decrypt_cpf")];
+    // A terceira dona é `fn_conferir_cpf_do_contato` (0706): decifra para
+    // COMPARAR os 3 últimos dígitos e devolve só boolean — guardas no item 7.
+    const donas = [
+      ...DEFINICOES_BASELINE,
+      ...definicoesDeFuncao(BASELINE, "decrypt_cpf"),
+      ...definicoesDeFuncao(BASELINE, "fn_conferir_cpf_do_contato"),
+    ];
     const fora: number[] = [];
     for (const i of ocorrencias) {
       if (!donas.some((d) => d.inicio < i && i < d.fim)) fora.push(i);
     }
     expect(
       fora,
-      `há um pgp_sym_decrypt() fora de fn_decrypt_oauth/decrypt_cpf (offset ${fora.join(", ")}) — cifra nova, guarda nova`,
+      `há um pgp_sym_decrypt() fora de fn_decrypt_oauth/decrypt_cpf/fn_conferir_cpf_do_contato (offset ${fora.join(", ")}) — cifra nova, guarda nova`,
     ).toEqual([]);
 
     // Sem os DOIS decifradores a lista de donos encolheria e o case passaria
@@ -234,5 +240,36 @@ describe("credencial de enfeite não derruba a leitura (#754)", () => {
       naMigration[0]!.corpo,
       "corpo divergente entre baseline (install) e migration 0597 (update)",
     ).toBe(corpo);
+  });
+
+  it("7. fn_conferir_cpf_do_contato é a terceira porta: as mesmas guardas, na ordem, e só boolean sai (0706)", () => {
+    const noBaseline = definicoesDeFuncao(BASELINE, "fn_conferir_cpf_do_contato");
+    expect(noBaseline.length, "fn_conferir_cpf_do_contato não aparece no baseline").toBeGreaterThan(0);
+    const corpo = noBaseline[noBaseline.length - 1]!.corpo;
+
+    const iNull = corpo.search(/v_cipher is null/);
+    const iTamanho = corpo.search(/octet_length\s*\(\s*v_cipher\s*\)\s*<\s*66/);
+    const iPacote = corpo.search(/get_byte\s*\(\s*v_cipher\s*,\s*0\s*\)\s*<\s*128/);
+    const iDecifra = corpo.indexOf("pgp_sym_decrypt");
+
+    expect(iNull, "falta a guarda de NULL").toBeGreaterThan(-1);
+    expect(iTamanho, "falta o piso medido (66 bytes)").toBeGreaterThan(-1);
+    expect(iPacote, "falta a checagem de cara de pacote PGP").toBeGreaterThan(-1);
+    expect(iDecifra, "a função não decifra nada").toBeGreaterThan(-1);
+    expect(iNull).toBeLessThan(iTamanho);
+    expect(iTamanho).toBeLessThan(iPacote);
+    expect(iPacote).toBeLessThan(iDecifra);
+    // O texto decifrado nunca é o retorno: ele só entra numa comparação.
+    expect(corpo).toMatch(/return right\(regexp_replace\(pgp_sym_decrypt\([^;]*\), 3\) = p_digitos;/);
+
+    const arquivo0706 = readdirSync(MIGRATIONS).find((n) => n.includes("_0706_"));
+    expect(arquivo0706, "migration 0706 não está em supabase/migrations/").toBeTruthy();
+    const migration0706 = readFileSync(join(MIGRATIONS, arquivo0706!), "utf8");
+    const naMigration = definicoesDeFuncao(migration0706, "fn_conferir_cpf_do_contato");
+    expect(naMigration.length, "a migration não define fn_conferir_cpf_do_contato").toBe(1);
+    expect(naMigration[0]!.corpo, "corpo divergente entre baseline (install) e migration 0706 (update)").toBe(corpo);
+    expect(migration0706).toMatch(
+      /revoke execute on function public\.fn_conferir_cpf_do_contato\(uuid, uuid, text\) from public, anon, authenticated;/,
+    );
   });
 });

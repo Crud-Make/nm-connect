@@ -52398,6 +52398,48 @@ $$;
 revoke all on function public.fn_upsert_meta_contact(uuid, text, text, text, text, text) from public, anon, authenticated;
 grant execute on function public.fn_upsert_meta_contact(uuid, text, text, text, text, text) to service_role;
 
+-- ---- trava do CPF pelo cadastro do contato: a função (migration 0706) ----
+-- A metade que CRIA FUNÇÃO, por isso aqui, antes da VARREDURA anon. A outra metade
+-- (connection_id nulo + nulls not distinct) fica no fim do arquivo, depois do bloco
+-- da 0676, que é quem cria `verificacoes_de_identidade`. O porquê está na migration.
+
+create or replace function public.fn_conferir_cpf_do_contato(
+  p_org uuid,
+  p_contato uuid,
+  p_digitos text
+) returns boolean
+    language plpgsql stable security definer
+    set search_path to 'public', 'private', 'extensions', 'pg_temp'
+    as $$
+declare
+  v_cipher bytea;
+begin
+  select cpf_encrypted into v_cipher
+    from public.contacts
+   where id = p_contato
+     and organization_id = p_org;
+
+  if v_cipher is null then return null; end if;
+  if octet_length(v_cipher) < 66 then
+    raise exception 'cpf_ciphertext_invalido';
+  end if;
+  if get_byte(v_cipher, 0) < 128 then
+    raise exception 'cpf_ciphertext_invalido';
+  end if;
+
+  if p_digitos is null or p_digitos !~ '^[0-9]{3}$' then
+    return false;
+  end if;
+
+  return right(regexp_replace(pgp_sym_decrypt(v_cipher, private.fn_cpf_key()), '[^0-9]', '', 'g'), 3) = p_digitos;
+end$$;
+
+revoke execute on function public.fn_conferir_cpf_do_contato(uuid, uuid, text) from public, anon, authenticated;
+grant  execute on function public.fn_conferir_cpf_do_contato(uuid, uuid, text) to service_role;
+
+comment on function public.fn_conferir_cpf_do_contato(uuid, uuid, text) is
+  'A trava do CPF pelo cadastro (0706): os 3 últimos dígitos conferem com contacts.cpf_encrypted? NULL = o contato não tem CPF. Nunca devolve o CPF. Só service_role.';
+
 -- ---- VARREDURA anon: função nova nasce exposta em quem ATUALIZA (migration 0116) ----
 --
 -- ⚠️ DE PROPÓSITO, NENHUMA FUNÇÃO É CRIADA DEPOIS DESTE BLOCO. Apêndice que cria
@@ -55086,3 +55128,20 @@ drop policy if exists tenant_isolation_verificacoes_de_identidade_select on publ
 create policy tenant_isolation_verificacoes_de_identidade_select on public.verificacoes_de_identidade
   for select
   using (organization_id in (select * from public.fn_user_org_ids()));
+
+-- ---- trava do CPF pelo cadastro do contato: a conexão nula (migration 0706) ----
+-- Não cria função, então pode ficar depois da VARREDURA anon; e TEM de vir depois
+-- do bloco da 0676, que cria a tabela. A função da mesma migration está antes da
+-- VARREDURA. Nenhuma linha existente tem conexão nula: não há o que deduplicar.
+
+alter table public.verificacoes_de_identidade
+  alter column connection_id drop not null;
+
+alter table public.verificacoes_de_identidade
+  drop constraint if exists verificacoes_de_identidade_unica;
+alter table public.verificacoes_de_identidade
+  add constraint verificacoes_de_identidade_unica
+    unique nulls not distinct (organization_id, contact_id, connection_id);
+
+comment on column public.verificacoes_de_identidade.connection_id is
+  'O banco externo em que a conferência foi feita. NULL = conferência contra o CPF do cadastro do contato (fn_conferir_cpf_do_contato). Única por (organização, contato, conexão) com nulls not distinct.';
