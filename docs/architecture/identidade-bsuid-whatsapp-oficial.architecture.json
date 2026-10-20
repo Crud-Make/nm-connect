@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": { "title": "BSUID do WhatsApp oficial", "subtitle": "Quem chega por username, sem telefone: entra, é respondido e ganha o telefone na mesma ficha", "output": "identidade-bsuid-whatsapp-oficial.html", "quality_profile": "standard" },
+  "lanes": [
+    { "id": "externo", "label": "Meta (Cloud API)" },
+    { "id": "servidor", "label": "Servidor" },
+    { "id": "banco", "label": "Persistência" },
+    { "id": "operador", "label": "Operação" }
+  ],
+  "mainPath": ["webhook", "parser", "ingest", "upsert", "contato", "posEntrada", "sink", "graph"],
+  "nodes": [
+    { "id": "webhook", "lane": "externo", "col": 1, "type": "external", "label": "webhook messages / smb_message_echoes (from omitido, from_user_id)" },
+    { "id": "parser", "lane": "servidor", "col": 2, "type": "lib", "label": "parseMetaWebhook — fromUserId, username, telefoneInformado, recipient_user_id, to_user_id" },
+    { "id": "semIdentidade", "lane": "servidor", "col": 3, "type": "lib", "label": "sem-identidade.ts — log + aviso (sem telefone e sem BSUID)" },
+    { "id": "ingest", "lane": "servidor", "col": 3, "type": "lib", "label": "ingestMetaInbound / ingestMetaEcho — resolverContatoMeta" },
+    { "id": "upsert", "lane": "banco", "col": 4, "type": "database", "label": "fn_upsert_meta_contact (BSUID primeiro, telefone depois, junta fichas)" },
+    { "id": "contato", "lane": "banco", "col": 5, "type": "database", "label": "contacts.wa_bsuid / wa_username (geradas de source_metadata, únicas por organização)" },
+    { "id": "fusao", "lane": "banco", "col": 5, "type": "database", "label": "fn_mesclar_contatos + gatilho contacts_mesclado_entrega_o_bsuid" },
+    { "id": "lgpd", "lane": "banco", "col": 6, "type": "database", "label": "fn_lgpd_cascade_redact_contact (zera o metadata) / export do titular (source_metadata)" },
+    { "id": "posEntrada", "lane": "servidor", "col": 5, "type": "lib", "label": "aplicarEfeitosPosEntrada — lead, opt-out, despacho do agente" },
+    { "id": "sink", "lane": "servidor", "col": 6, "type": "service", "label": "sendMessageHandler (IA, Inbox, follow-up, automação) → resolveRecipient(waBsuid)" },
+    { "id": "pedirTelefone", "lane": "servidor", "col": 6, "type": "lib", "label": "requestContactInfo — botão REQUEST_CONTACT_INFO (pedir-telefone.ts)" },
+    { "id": "graph", "lane": "externo", "col": 7, "type": "external", "label": "POST /messages — recipient: BSUID (sem telefone) ou to: telefone" },
+    { "id": "central", "lane": "operador", "col": 4, "type": "frontend", "label": "Central de avisos — event_dead 'mensagem sem remetente'" },
+    { "id": "inbox", "lane": "operador", "col": 6, "type": "frontend", "label": "Inbox / Contatos — @username ou 'Cliente sem telefone' (rotuloDoContato)" }
+  ],
+  "edges": [
+    { "id": "e1", "from": "webhook", "to": "parser", "label": "corpo assinado" },
+    { "id": "e2", "from": "parser", "to": "ingest", "label": "telefone, BSUID ou os dois" },
+    { "id": "e3", "from": "parser", "to": "semIdentidade", "label": "nenhuma identidade" },
+    { "id": "e4", "from": "semIdentidade", "to": "central", "label": "aviso aberto (um por organização)" },
+    { "id": "e5", "from": "ingest", "to": "upsert", "label": "BSUID + telefone canônico" },
+    { "id": "e6", "from": "upsert", "to": "contato", "label": "uma ficha por pessoa" },
+    { "id": "e7", "from": "upsert", "to": "fusao", "label": "ficha só-BSUID + ficha do telefone" },
+    { "id": "e8", "from": "fusao", "to": "contato", "label": "vencedor herda BSUID e username" },
+    { "id": "e9", "from": "contato", "to": "lgpd", "label": "anonimização apaga; export entrega" },
+    { "id": "e10", "from": "ingest", "to": "posEntrada", "label": "lead nasce, agente acorda" },
+    { "id": "e11", "from": "posEntrada", "to": "sink", "label": "resposta da IA" },
+    { "id": "e12", "from": "contato", "to": "sink", "label": "wa_bsuid quando não há telefone" },
+    { "id": "e13", "from": "sink", "to": "graph", "label": "recipient ou to" },
+    { "id": "e14", "from": "pedirTelefone", "to": "graph", "label": "interativo request_contact_info" },
+    { "id": "e15", "from": "graph", "to": "webhook", "label": "telefone volta (origin: contact_request)" },
+    { "id": "e16", "from": "contato", "to": "inbox", "label": "rótulo sem telefone" },
+    { "id": "e17", "from": "inbox", "to": "sink", "label": "resposta humana" }
+  ]
+}
