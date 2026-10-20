@@ -30,6 +30,7 @@ import {
 } from "./graph-parceiro/webhook";
 import { sincronizarSaudeDaConexao } from "./health";
 import { lerEnvelopeMeta } from "./meta/envelope";
+import { avisarMensagemSemIdentidade } from "./meta/sem-identidade";
 import { ingestMetaAppContactSync, ingestMetaEcho, ingestMetaInbound } from "./meta/ingest";
 import { parseMetaWebhook } from "./meta/webhook";
 import { samePhone } from "./phone-variants";
@@ -396,6 +397,17 @@ async function datafyInbound(
         channelSessionId: input.session.id,
       });
       desfechos.push(r.status);
+      continue;
+    }
+    if (e.kind === "inbound_sem_identidade") {
+      // Mesma régua do canal oficial (`processarWebhookMeta`): sem telefone e
+      // sem BSUID não vira linha, mas vira log + aviso — nunca silêncio.
+      if (e.phoneNumberId !== refs.phoneNumberId) {
+        desfechos.push("outro_numero");
+        continue;
+      }
+      await avisarMensagemSemIdentidade(admin, orgId, e, `datafy:${input.session.id}`);
+      desfechos.push("sem_identidade");
       continue;
     }
     if (e.kind === "outbound_echo") {

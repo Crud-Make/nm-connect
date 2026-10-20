@@ -282,6 +282,73 @@ async function findContactByVariants(
   return encontrarContatoPorTelefone(admin as never, orgId, waId);
 }
 
+/**
+ * O contato de uma mensagem do canal oficial — por telefone, por BSUID, ou pelos dois.
+ *
+ * ─── Por que duas RPCs, e qual vale quando ──────────────────────────────────
+ *
+ * Sem BSUID no evento é o caminho de sempre, byte a byte: `fn_upsert_wa_contact`
+ * com o telefone canônico. Com BSUID, quem decide é `fn_upsert_meta_contact`
+ * (migration 0678), que procura PRIMEIRO pelo BSUID e só depois pelo telefone —
+ * nessa ordem porque quem chegou só por BSUID e agora mandou o telefone já tem
+ * ficha, e procurar só pelo telefone criaria a segunda. Quando as duas buscas
+ * acham fichas diferentes e a do BSUID ainda não tem telefone, o banco as junta
+ * (`fn_mesclar_contatos`) — é o "juntar sem duplicar" do lead que veio do
+ * anúncio e depois deu o número.
+ *
+ * O telefone continua passando por `findContactByVariants` aqui, igual a antes:
+ * a grafia que já está no banco vence a do webhook (o nono dígito).
+ */
+async function resolverContatoMeta(
+  admin: Admin,
+  orgId: string,
+  quem: {
+    /** Dígitos do `wa_id`/`to`, ou o telefone informado — `null` sem telefone. */
+    telefone: string | null;
+    /** O `from`/`to` cru, que a RPC guarda como `waha_chat_id`. */
+    chatId: string | null;
+    bsuid: string | null;
+    username: string | null;
+    notify: string | null;
+  },
+): Promise<{ contactId: string | null; erro: string | null }> {
+  let phone: string | null = null;
+  if (quem.telefone) {
+    const existente = await findContactByVariants(admin, orgId, quem.telefone);
+    // Celular BR grava COM o nono. A busca acima já reencontra a grafia sem o 9;
+    // a RPC promove o cadastro antigo quando ainda está nos 12 dígitos.
+    phone = existente?.phone_number
+      ? canonicalPhoneBR(existente.phone_number)
+      : canonicalPhoneBR(`+${quem.telefone.replace(/\D/g, "")}`);
+  }
+
+  const { data, error } = quem.bsuid
+    ? await admin.rpc(
+        "fn_upsert_meta_contact" as never,
+        {
+          p_org: orgId,
+          p_bsuid: quem.bsuid,
+          p_username: quem.username,
+          p_phone: phone,
+          p_chat_id: quem.chatId,
+          p_notify: quem.notify,
+        } as never,
+      )
+    : await admin.rpc(
+        "fn_upsert_wa_contact" as never,
+        {
+          p_org: orgId,
+          p_kind: "phone",
+          p_phone: phone,
+          p_lid: null,
+          p_chat_id: quem.chatId,
+          p_notify: quem.notify,
+        } as never,
+      );
+  if (error || !data) return { contactId: null, erro: error?.message ?? "sem id" };
+  return { contactId: data as string, erro: null };
+}
+
 /** Prévia curta para a lista de conversas. Mídia vira rótulo, nunca URL. */
 function previewOf(e: InboundMessageEvent): string {
   if (e.type === "text") return (e.text ?? "").slice(0, 120);
@@ -324,18 +391,30 @@ export async function ingestMetaInbound(
 
   const orgId = sessao.organization_id;
 
+  // O telefone de quem mandou: o `from` ou — quando a Meta o omitiu porque a
+  // pessoa usa username — o que ela informou tocando no botão de pedido de
+  // contato. Sem nenhum dos dois, quem identifica é o BSUID.
+  const telefone = e.from ?? e.telefoneInformado ?? null;
+  if (!telefone && !e.fromUserId) {
+    // O parser já separa esse caso (`inbound_sem_identidade`); chegar aqui é
+    // evento montado à mão. Falha nomeada, nunca contato sem identidade.
+    return { status: "failed", reason: "sem_identidade" };
+  }
+
   // ── O NÚMERO INTERNO DE AVISOS NÃO VIRA ATENDIMENTO ─────────────────────
   //
   // Antes do upsert do contato, que é o que importa: é o nascimento da conversa
   // que dispara o pedido de rodízio pelo banco. O identificador aqui chega só em
   // dígitos (`wa_id`), e o `+` é o que a comparação por variantes do nono dígito
-  // espera — quem casa é a mesma regra dos outros dois ingestores.
+  // espera — quem casa é a mesma regra dos outros dois ingestores. Sem telefone
+  // não há o que comparar: o número interno é um TELEFONE da equipe.
   if (
-    await ehNumeroInternoDeAviso(admin, orgId, {
+    telefone &&
+    (await ehNumeroInternoDeAviso(admin, orgId, {
       kind: "phone",
-      phone: `+${e.from.replace(/\D/g, "")}`,
+      phone: `+${telefone.replace(/\D/g, "")}`,
       lid: null,
-    })
+    }))
   ) {
     await registrarMensagemIgnorada(admin, orgId, {
       direction: "inbound",
@@ -344,26 +423,15 @@ export async function ingestMetaInbound(
     return { status: "ignored", reason: "numero_interno_de_aviso" };
   }
 
-  const existente = await findContactByVariants(admin, orgId, e.from);
-  // Celular BR grava COM o nono. A busca acima já reencontra a grafia sem o 9;
-  // a RPC promove o cadastro antigo quando ainda está nos 12 dígitos.
-  const phone = existente?.phone_number
-    ? canonicalPhoneBR(existente.phone_number)
-    : canonicalPhoneBR(`+${e.from.replace(/\D/g, "")}`);
-
-  const { data: contactId, error: erroContato } = await admin.rpc(
-    "fn_upsert_wa_contact" as never,
-    {
-      p_org: orgId,
-      p_kind: "phone",
-      p_phone: phone,
-      p_lid: null,
-      p_chat_id: e.from,
-      p_notify: e.profileName,
-    } as never,
-  );
-  if (erroContato || !contactId) {
-    return { status: "failed", reason: `contato: ${erroContato?.message ?? "sem id"}` };
+  const { contactId, erro: erroContato } = await resolverContatoMeta(admin, orgId, {
+    telefone,
+    chatId: e.from,
+    bsuid: e.fromUserId ?? null,
+    username: e.username ?? null,
+    notify: e.profileName,
+  });
+  if (!contactId) {
+    return { status: "failed", reason: `contato: ${erroContato ?? "sem id"}` };
   }
 
   // Clique em anúncio: o `referral` vem na própria mensagem e só nela. Estampar
@@ -531,32 +599,32 @@ export async function ingestMetaEcho(
   if (!sessao) return { status: "no_session" };
 
   const orgId = sessao.organization_id;
-  const telefone = `+${e.to.replace(/\D/g, "")}`;
+  if (!e.to && !e.toUserId) return { status: "failed", reason: "sem_identidade" };
 
   // O número interno de avisos não vira conversa — mesma guarda da recebida.
-  if (await ehNumeroInternoDeAviso(admin, orgId, { kind: "phone", phone: telefone, lid: null })) {
+  // Só com telefone: o eco a um BSUID não tem número para comparar.
+  if (
+    e.to &&
+    (await ehNumeroInternoDeAviso(admin, orgId, {
+      kind: "phone",
+      phone: `+${e.to.replace(/\D/g, "")}`,
+      lid: null,
+    }))
+  ) {
     await registrarMensagemIgnorada(admin, orgId, { direction: "outbound", sessionId: sessao.id });
     return { status: "ignored", reason: "numero_interno_de_aviso" };
   }
 
-  const existente = await findContactByVariants(admin, orgId, e.to);
-  const phone = existente?.phone_number
-    ? canonicalPhoneBR(existente.phone_number)
-    : canonicalPhoneBR(telefone);
-
-  const { data: contactId, error: erroContato } = await admin.rpc(
-    "fn_upsert_wa_contact" as never,
-    {
-      p_org: orgId,
-      p_kind: "phone",
-      p_phone: phone,
-      p_lid: null,
-      p_chat_id: e.to,
-      p_notify: null,
-    } as never,
-  );
-  if (erroContato || !contactId) {
-    return { status: "failed", reason: `contato: ${erroContato?.message ?? "sem id"}` };
+  const { contactId, erro: erroContato } = await resolverContatoMeta(admin, orgId, {
+    telefone: e.to,
+    chatId: e.to,
+    bsuid: e.toUserId ?? null,
+    username: e.username ?? null,
+    // O eco não traz o perfil do CLIENTE — ver o cabeçalho desta função.
+    notify: null,
+  });
+  if (!contactId) {
+    return { status: "failed", reason: `contato: ${erroContato ?? "sem id"}` };
   }
 
   const { data: conversationId, error: erroConversa } = await admin.rpc(
