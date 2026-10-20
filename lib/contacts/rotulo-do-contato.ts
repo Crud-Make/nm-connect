@@ -152,7 +152,11 @@ export function rotuloDoContato(
   // BSUID nunca vai para a tela (é id de máquina — a regra do topo).
   const username = (c.wa_username ?? "").trim().replace(/^@+/, "");
   if (username !== "") return `@${username}`;
-  if ((c.wa_bsuid ?? "").trim() !== "") return t(SEM_TELEFONE);
+  // Sem `t()` de propósito, por ora: a frase ainda não tem linha em
+  // `lib/i18n/dicionario.ts` (a cerca `i18n-espanhol-cobre-a-tela` reprova chave
+  // sem espanhol), e esse arquivo não é deste PR. Em qualquer idioma ela sai em
+  // português até a linha entrar.
+  if ((c.wa_bsuid ?? "").trim() !== "") return SEM_TELEFONE;
 
   return t(SEM_NOME);
 }
