@@ -174,6 +174,10 @@ const SITES: { arquivo: string; fronteira: string; papel?: "gerador" | "validado
   { arquivo: "app/api/v1/channels/partner/templates/media/route.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/settings/sons/route.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/marca/logo/route.ts", fronteira: "storage.chave-de-objeto" },
+  // Resposta em nota de voz: `<org>/<conversa>/voz-<uuid>.ogg` — org e conversa
+  // vêm da linha do job (fonte confiável), o uuid é do `randomUUID`. Nada que o
+  // modelo ou o cliente escreveu entra na chave.
+  { arquivo: "lib/messaging/voz/guardar-nota-de-voz.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/conversations/[id]/media/route.ts", fronteira: "storage.chave-de-objeto" },
   // O anexo da nota interna (#1863, F3): MESMO molde de chave da rota irmã
   // (`{org}/{conversa}/note-{uuid}.{ext}`), bucket próprio `internal-media`.

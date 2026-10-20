@@ -78,6 +78,8 @@ describe("costCents — cada tarifa isolada, por modelo", () => {
     ["gpt-4o-mini", 15, 60, 7.5, 15, 15],
     ["gpt-4o", 250, 1000, 125, 250, 250],
     ["gpt-4o-2024-05-13", 500, 1500, 500, 500, 500],
+    // Voz (resposta em nota de voz): entrada de TEXTO e saída de ÁUDIO, sem cache.
+    ["gpt-4o-mini-tts", 60, 1200, 60, 60, 60],
     // Linha 6 (conferida em 11/10/2026): leitura de cache a 0.05× só no gpt-6.1-sol.
     ["gpt-6-astra", 1000, 5000, 100, 1250, 1250],
     ["gpt-6.1-sol", 200, 1000, 10, 250, 250],
