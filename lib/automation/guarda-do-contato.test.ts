@@ -38,6 +38,24 @@ describe("checarGuardasDeContato", () => {
     expect(r).toEqual({ ok: false, reason: "no_phone" });
   });
 
+  it("sem telefone e com BSUID (lead que veio por username): PASSA, e o contato leva o BSUID", () => {
+    // O WhatsApp oficial endereça pelo BSUID (migration 0678). Num canal que não
+    // sabe, o envio cai em `missing_phone_number` no sink — falha nomeada, nunca
+    // mensagem para o endereço errado.
+    const r = checarGuardasDeContato(
+      ctxComContato({ id: "c1", phone_number: null, wa_bsuid: "US.13491208655302741918" }),
+    );
+    expect(r).toEqual({
+      ok: true,
+      contact: { id: "c1", phone_number: null, wa_bsuid: "US.13491208655302741918" },
+    });
+  });
+
+  it("BSUID vazio não conta como endereço: no_phone", () => {
+    const r = checarGuardasDeContato(ctxComContato({ id: "c1", phone_number: null, wa_bsuid: "  " }));
+    expect(r).toEqual({ ok: false, reason: "no_phone" });
+  });
+
   /**
    * ⚠️ OS TRÊS CASOS ABAIXO SÃO O CONTRÁRIO DO QUE A PRIMEIRA VERSÃO AFIRMAVA,
    * e a razão está medida no cabeçalho de `guarda-do-contato.ts`: o DEFAULT da
