@@ -27,6 +27,8 @@ interface FormShape {
   name?: string;
   email?: string;
   phone_number?: string;
+  /** Só sai no payload quando digitado: o CPF guardado é cifrado e não volta à tela. */
+  cpf?: string;
   /** `AAAA-MM-DD` — a MESMA forma de `contactPatchSchema` e da coluna do banco. */
   birthdate?: string;
   tagsRaw?: string;
@@ -41,6 +43,19 @@ interface Props {
   customFieldDefs?: CustomFieldDef[];
 }
 
+/** O formulário aberto sobre o contato — na montagem e a cada reabertura. */
+function valoresDoContato(contact: Contact): FormShape {
+  return {
+    name: contact.name ?? "",
+    email: contact.email ?? "",
+    phone_number: contact.phone_number ? phoneForDisplay(contact.phone_number) : "",
+    cpf: "",
+    birthdate: contact.birthdate ?? "",
+    tagsRaw: contact.tags.join(", "),
+    custom_fields: contact.custom_fields ?? {},
+  };
+}
+
 export function EditContactDialog({ contact, open, onOpenChange, customFieldDefs = [] }: Props) {
   const t = useT();
   const perfil = perfilDoPais(useActiveOrg()?.country);
@@ -48,28 +63,14 @@ export function EditContactDialog({ contact, open, onOpenChange, customFieldDefs
   const [serverError, setServerError] = useState<string | null>(null);
 
   const form = useForm<FormShape>({
-    defaultValues: {
-      name: contact.name ?? "",
-      email: contact.email ?? "",
-      phone_number: contact.phone_number ? phoneForDisplay(contact.phone_number) : "",
-      birthdate: contact.birthdate ?? "",
-      tagsRaw: contact.tags.join(", "),
-      custom_fields: contact.custom_fields ?? {},
-    },
+    defaultValues: valoresDoContato(contact),
   });
 
   const customFields = useWatch({ control: form.control, name: "custom_fields" });
 
   useEffect(() => {
     if (open) {
-      form.reset({
-        name: contact.name ?? "",
-        email: contact.email ?? "",
-        phone_number: contact.phone_number ? phoneForDisplay(contact.phone_number) : "",
-        birthdate: contact.birthdate ?? "",
-        tagsRaw: contact.tags.join(", "),
-        custom_fields: contact.custom_fields ?? {},
-      });
+      form.reset(valoresDoContato(contact));
     }
   }, [open, contact, form]);
 
@@ -83,6 +84,7 @@ export function EditContactDialog({ contact, open, onOpenChange, customFieldDefs
     if (values.name?.trim()) payload.name = values.name.trim();
     if (values.email?.trim()) payload.email = values.email.trim();
     if (values.phone_number?.trim()) payload.phone_number = values.phone_number.trim();
+    if (values.cpf?.trim()) payload.cpf = values.cpf.trim();
     // Igual aos campos de cima: só manda quando há data. O `type="date"` devolve
     // `AAAA-MM-DD` (a forma que `contactPatchSchema` e a coluna `birthdate` já
     // exigem), então o diálogo não normaliza nada — o que se digita é o que se
@@ -128,6 +130,19 @@ export function EditContactDialog({ contact, open, onOpenChange, customFieldDefs
           <div className="space-y-2">
             <Label htmlFor="ec-phone">{t("Telefone (E.164)")}</Label>
             <Input id="ec-phone" {...form.register("phone_number")} />
+          </div>
+          <div className="space-y-2">
+            {/* O documento do PAÍS da organização, como em NewContactDialog. */}
+            <Label htmlFor="ec-cpf">{perfil.documento.rotulo}</Label>
+            <Input
+              id="ec-cpf"
+              placeholder={
+                contact.cpf_hash
+                  ? t("Já cadastrado — deixe em branco para manter.")
+                  : perfil.documento.exemplo
+              }
+              {...form.register("cpf")}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="ec-birthdate">{t("Data de nascimento")}</Label>

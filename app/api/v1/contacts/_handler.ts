@@ -663,7 +663,24 @@ export async function patchContactHandler(
     // falha aqui, o par ANTIGO permanece intacto (hash e texto continuam do
     // mesmo CPF) — apagar só um dos dois seria a corrupção silenciosa que o
     // CHECK existe para impedir.
-    Object.assign(patch, await camposCpfParaGravar(supabase, input.cpf));
+    //
+    // Ao contrário do create, aqui o CPF é o pedido inteiro de quem editou: sem a
+    // cifra, descartá-lo em silêncio respondia "Contato atualizado" (ou "Nenhum
+    // campo para atualizar", quando era o único campo) e a ficha seguia sem CPF.
+    const cpf = await camposCpfParaGravar(supabase, input.cpf);
+    if (!cpf.cpf_hash) {
+      throw new ApiError(
+        503,
+        "unavailable",
+        undefined,
+        ctx.requestId,
+        traduzir(
+          "Não foi possível guardar o CPF: a cifra do CPF não está configurada nesta instalação.",
+          ctx.idioma ?? "pt-BR",
+        ),
+      );
+    }
+    Object.assign(patch, cpf);
   }
 
   if (Object.keys(patch).length === 0) {

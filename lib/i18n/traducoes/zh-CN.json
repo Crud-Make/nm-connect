@@ -5095,6 +5095,8 @@
   "status inválido.": "无效的 status。",
   "Contato anonimizado — edição bloqueada (LGPD).": "联系人已匿名化——编辑已锁定（LGPD）。",
   "Nenhum campo para atualizar.": "没有可更新的字段。",
+  "Não foi possível guardar o CPF: a cifra do CPF não está configurada nesta instalação.": "无法保存 CPF：此安装未配置 CPF 加密。",
+  "Já cadastrado — deixe em branco para manter.": "已登记 — 留空则保持不变。",
   "Contato não encontrado após update.": "更新后未找到联系人。",
   "Não foi possível excluir: o contato ainda tem registros vinculados.": "无法删除：该联系人仍有绑定的记录。",
   "Um lead tem um dono: informe owner_user_id OU owner_agent_id.": "一个销售线索只能有一个负责人：请提供 owner_user_id 或 owner_agent_id。",

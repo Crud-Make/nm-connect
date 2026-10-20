@@ -11706,6 +11706,10 @@ export const DICIONARIO: Traducoes = {
     es: "Contacto anonimizado — edición bloqueada (LGPD).",
   },
   "Nenhum campo para atualizar.": { es: "Ningún campo para actualizar." },
+  "Não foi possível guardar o CPF: a cifra do CPF não está configurada nesta instalação.": {
+    es: "No se pudo guardar el CPF: el cifrado del CPF no está configurado en esta instalación.",
+  },
+  "Já cadastrado — deixe em branco para manter.": { es: "Ya registrado — déjalo en blanco para mantenerlo." },
   "Contato não encontrado após update.": { es: "Contacto no encontrado después de la actualización." },
   "Não foi possível excluir: o contato ainda tem registros vinculados.": {
     es: "No se pudo eliminar el contacto: todavía tiene registros vinculados.",
