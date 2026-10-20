@@ -9,9 +9,20 @@
 #
 # Requer Docker Compose >= 2.24.4 (tags `!override` e `!reset`).
 # Detalhes e o que validar: docs/nm/sem-waha.md.
+#
+# app, worker e scheduler vêm prontos do GHCR, construídos pelo workflow
+# nm-imagens a cada merge na main: a máquina só baixa. NM_IMAGEM_TAG escolhe a
+# versão (`main`, o padrão, ou `sha-<7>` de um commit). Para compilar a branch
+# local em vez de baixar, `up -d --build`: o `build:` do local.yml segue valendo.
+# O ciclo pull + up está em scripts/nm/atualizar-stack-local.sh; prefira-o ao
+# `up -d` puro, que compila tudo aqui se o pull falhar.
 
 services:
   app:
+    image: ghcr.io/crud-make/nm-connect-app:${NM_IMAGEM_TAG:-main}
+    # Tag móvel → `always` (doutrina de packaging). O `never` do local.yml
+    # deixaria o `docker compose pull` pular o serviço.
+    pull_policy: always
     environment:
       # O local.yml fixa WAHA_API_BASE_URL=http://waha:3000, que vence o
       # .env.local. Os valores abaixo são os do .env.nm.example: a URL aponta
@@ -26,9 +37,15 @@ services:
         condition: service_started
 
   worker:
+    image: ghcr.io/crud-make/nm-connect-worker:${NM_IMAGEM_TAG:-main}
+    pull_policy: always
     # O worker só dependia do waha. Com http://waha:3000 sem resolver, o
     # watchdog pula o tick de reconciliação, como em produção.
     depends_on: !reset []
+
+  scheduler:
+    image: ghcr.io/crud-make/nm-connect-scheduler:${NM_IMAGEM_TAG:-main}
+    pull_policy: always
 
   waha:
     # Fora do `up` padrão. Para religar (plano B da demo, diagnóstico):
