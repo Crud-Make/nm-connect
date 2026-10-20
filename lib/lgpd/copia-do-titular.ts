@@ -60,6 +60,8 @@ export const SECOES_DA_EQUIPE = {
   case_chat_messages: "a conversa interna da equipe com a IA sobre o caso",
   appointment_notices:
     "aviso da Central PARA a equipe sobre o compromisso (registrar desfecho, revisar recuperação): tarefa interna, não dado dele",
+  andamentos_da_equipe:
+    "o andamento ainda em rascunho, que nenhuma pessoa aprovou para ele, e quem escreveu e quem aprovou cada um: trabalho interno do escritório (o aprovado vai em `andamentos`)",
 } as const satisfies Partial<Record<keyof ExportPayload, string>>;
 
 /**
@@ -89,6 +91,8 @@ export const O_QUE_FICA = {
   leads: "as oportunidades abertas para ele: título, estado e valor",
   honorarios_contratos: "o contrato de honorários dele (sem a divisão interna do escritório)",
   honorarios_parcelas: "as parcelas que ele paga",
+  processos: "os processos dele: número, apelido, área e fase",
+  andamentos: "os andamentos que o escritório aprovou para ele, com a data da aprovação",
   orders: "os pedidos dele na loja",
   activities: "o que foi registrado sobre ele e quando",
   checkpoints: "o resumo que a máquina fez da conversa com ele (LGPD art. 20)",
