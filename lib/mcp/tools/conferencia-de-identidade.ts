@@ -14,11 +14,14 @@
  * É ESCRITA (grava a tentativa em `verificacoes_de_identidade`, e o bloqueio
  * abre aviso na Central), mesmo lendo o banco externo — `tests/unit/tool-read-nao-muta.test.ts`.
  *
- * Duas peças daqui são de QUALQUER fonte da trava, e por isso são exportadas:
- * `concluirConferencia` (a cauda depois de saber se confere — gravar, bloquear,
- * avisar a Central, responder) e `recusaPelaTravaDoCpf` (a recusa da consulta
- * sem conferência válida). A fonte é a conexão do banco externo, ou `null` para o
- * CPF do cadastro do contato (migration 0706).
+ * As peças que não dependem de ONDE se confere são de QUALQUER fonte da trava, e
+ * por isso são exportadas: o contrato com o modelo (`digitosShape`,
+ * `redigirDigitos`, `motivoDaConferencia`), o atalho antes de perguntar à fonte
+ * (`respostaSemPerguntarAFonte`), a cauda depois de saber se confere
+ * (`concluirConferencia` — gravar, bloquear, avisar a Central, responder) e a
+ * recusa da consulta sem conferência válida (`recusaPelaTravaDoCpf`). A fonte é a
+ * conexão do banco externo, ou `null` para o CPF do cadastro do contato
+ * (migration 0706, `crm_confirm_processos_identity` em `./processos.ts`).
  */
 import { z } from "zod";
 
@@ -74,7 +77,17 @@ function respostaBloqueado() {
   return { confere: false, tentativas_restantes: 0, bloqueado: true, mensagem: MENSAGEM_BLOQUEADO };
 }
 
-const inputShape = {
+/** Falha do CRM ou da fonte não é erro do cliente: não gasta tentativa. */
+export function falhaNaConferencia() {
+  return { erro: "falha_na_conferencia", mensagem: "não foi possível conferir agora. Diga que a equipe confirma." };
+}
+
+/** Sem contato do turno não há de quem conferir. */
+export function foraDaConversa() {
+  return { erro: "fora_da_conversa", mensagem: "a conferência de CPF só existe dentro de uma conversa com o cliente." };
+}
+
+export const digitosShape = {
   digitos: z
     .string()
     .regex(/^[0-9]{3}$/, "exatamente 3 números")
@@ -82,12 +95,12 @@ const inputShape = {
 };
 
 /** Os dígitos são parte do CPF: nunca vão ao `api_audit_log`. */
-function redigirDigitos(args: Record<string, unknown>): Record<string, unknown> {
+export function redigirDigitos(args: Record<string, unknown>): Record<string, unknown> {
   return "digitos" in args ? { ...args, digitos: "[redigido]" } : args;
 }
 
 /** "Não conferiu" e "bloqueado" não são sucesso no audit (#484). Código fixo, sem dado. */
-function motivoDaConferencia(resultado: unknown): string | null {
+export function motivoDaConferencia(resultado: unknown): string | null {
   if (resultado === null || typeof resultado !== "object") return null;
   const r = resultado as { erro?: unknown; confere?: unknown; bloqueado?: unknown };
   if (typeof r.erro === "string") return r.erro;
@@ -95,7 +108,7 @@ function motivoDaConferencia(resultado: unknown): string | null {
   return r.confere === false ? "nao_conferiu" : null;
 }
 
-export const crmConfirmCustomerIdentity: McpToolDefinition<typeof inputShape> = {
+export const crmConfirmCustomerIdentity: McpToolDefinition<typeof digitosShape> = {
   name: "crm_confirm_customer_identity",
   description:
     "Confere a identidade do cliente desta conversa antes de mostrar dados de um banco conectado " +
@@ -105,7 +118,7 @@ export const crmConfirmCustomerIdentity: McpToolDefinition<typeof inputShape> = 
     "conferiu e quantas tentativas restam. Nunca repita os dígitos na sua resposta, nunca diga " +
     "qual dígito está errado e nunca peça o CPF inteiro. Depois de 3 erros a conferência fica " +
     "bloqueada por 24 horas: diga que a equipe vai atender e passe a conversa para uma pessoa.",
-  inputSchema: inputShape,
+  inputSchema: digitosShape,
   category: "write",
   // `ai_operator`: só o agente no turno de uma conversa tem para quem conferir,
   // e nenhuma PESSOA alcança este papel — um token humano não vira máquina de
@@ -116,18 +129,13 @@ export const crmConfirmCustomerIdentity: McpToolDefinition<typeof inputShape> = 
   motivoDoVazio: motivoDaConferencia,
   handler: async (input, ctx) => {
     const contatoId = ctx.contatoDoTurno;
-    if (!contatoId) {
-      return {
-        erro: "fora_da_conversa",
-        mensagem: "a conferência de CPF só existe dentro de uma conversa com o cliente.",
-      };
-    }
+    if (!contatoId) return foraDaConversa();
 
     let conexoes: Array<{ id: string; label: string }>;
     try {
       conexoes = await conexoesQueExigemCpf(ctx.supabase, ctx.organizationId);
     } catch {
-      return { erro: "falha_na_conferencia", mensagem: "não foi possível conferir agora. Diga que a equipe confirma." };
+      return falhaNaConferencia();
     }
     if (conexoes.length === 0) {
       return {
@@ -150,14 +158,11 @@ export const crmConfirmCustomerIdentity: McpToolDefinition<typeof inputShape> = 
     try {
       estado = await lerConferencia(ctx.supabase, ctx.organizationId, contatoId, conexaoId);
     } catch {
-      return { erro: "falha_na_conferencia", mensagem: "não foi possível conferir agora. Diga que a equipe confirma." };
+      return falhaNaConferencia();
     }
 
-    // Bloqueado e já conferido NÃO perguntam ao banco externo: o primeiro é o
-    // que impede a força bruta (1.000 combinações), o segundo poupa a ida.
-    const situacao = situacaoDaConferencia(estado, agora);
-    if (situacao.tipo === "bloqueado") return respostaBloqueado();
-    if (situacao.tipo === "verificado") return respostaConferiu(CONSULTA_DO_BANCO_EXTERNO);
+    const pronta = respostaSemPerguntarAFonte(estado, agora, CONSULTA_DO_BANCO_EXTERNO);
+    if (pronta) return pronta;
 
     const acesso = await abrirAcesso(ctx.supabase, ctx.organizationId, conexaoId);
     if (!acesso.ok) {
@@ -168,7 +173,7 @@ export const crmConfirmCustomerIdentity: McpToolDefinition<typeof inputShape> = 
     try {
       telefone = await telefoneDoContato(ctx.supabase, ctx.organizationId, contatoId);
     } catch {
-      return { erro: "falha_na_conferencia", mensagem: "não foi possível conferir agora. Diga que a equipe confirma." };
+      return falhaNaConferencia();
     }
     if (!telefone) {
       return {
@@ -182,7 +187,7 @@ export const crmConfirmCustomerIdentity: McpToolDefinition<typeof inputShape> = 
       confere = await conferirCpfNoBancoExterno(acesso.pool, telefone, input.digitos);
     } catch {
       // Falha do banco externo não é erro do cliente: não gasta tentativa.
-      return { erro: "falha_na_conferencia", mensagem: "não foi possível conferir agora. Diga que a equipe confirma." };
+      return falhaNaConferencia();
     }
 
     return concluirConferencia(
@@ -194,6 +199,22 @@ export const crmConfirmCustomerIdentity: McpToolDefinition<typeof inputShape> = 
     );
   },
 };
+
+/**
+ * Bloqueado e já conferido NÃO perguntam à fonte: o primeiro é o que impede a
+ * força bruta (1.000 combinações), o segundo poupa a ida. `null` = pendente, a
+ * fonte precisa responder.
+ */
+export function respostaSemPerguntarAFonte(
+  estado: EstadoDaConferencia | null,
+  agora: Date,
+  ferramentaDeConsulta: string,
+): Record<string, unknown> | null {
+  const situacao = situacaoDaConferencia(estado, agora);
+  if (situacao.tipo === "bloqueado") return respostaBloqueado();
+  if (situacao.tipo === "verificado") return respostaConferiu(ferramentaDeConsulta);
+  return null;
+}
 
 /**
  * A cauda de toda conferência, depois de a fonte dizer se os dígitos conferem:

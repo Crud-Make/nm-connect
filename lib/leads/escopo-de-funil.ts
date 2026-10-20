@@ -143,6 +143,7 @@ export const ALVO_DE_FUNIL: Record<string, AlvoDeFunil> = {
   // A trava do CPF (#18): grava só a tentativa de conferência do contato do
   // turno em `verificacoes_de_identidade` — nenhum card, nenhum funil.
   crm_confirm_customer_identity: "sem_funil",
+  crm_confirm_processos_identity: "sem_funil",
   crm_propose_contact_field: "sem_funil",
   // Rascunho sugerido por integração (#1611): opera por `conversation_id`,
   // nunca `lead_id`, e não mexe em estado de funil nenhum. A barreira é OUTRA,

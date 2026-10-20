@@ -141,6 +141,9 @@ beforeAll(async () => {
   // `relation "sales" does not exist` e este arquivo inteiro cai por um módulo que não é o
   // assunto dele (o assunto é agenda/Meet no relatório do titular).
   await pool.query("select public.fn_financeiro_provisionar();");
+  // O mesmo vale para `processos` (módulo da advocacia): o export lê `processos` e
+  // `andamentos`, que só nascem em `fn_processos_provisionar()`.
+  await pool.query("select public.fn_processos_provisionar();");
   vi.mocked(createAdminClient).mockReturnValue({
     from: (table: string) => new ReadQuery(table),
   } as never);

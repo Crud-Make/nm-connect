@@ -43,7 +43,7 @@ import { copiaDoTitular, O_QUE_FICA, SECOES_DA_EQUIPE } from "@/lib/lgpd/copia-d
 import { collectExportData, type ExportPayload } from "@/lib/lgpd/export-collector";
 
 /** Seções inteiras que não podem sair. */
-const SECOES_PROIBIDAS = ["conversation_notes", "case_chat_messages", "appointment_notices"];
+const SECOES_PROIBIDAS = ["conversation_notes", "case_chat_messages", "appointment_notices", "andamentos_da_equipe"];
 
 /**
  * As seis notas da equipe SOBRE o titular (doc 110, 3A), escritas à mão: fora
@@ -230,6 +230,10 @@ function payloadCheio(): ExportPayload {
       },
     ],
     case_chat_messages: [{ id: "y", body: "SEGREDO-chat-interno" }],
+    // Processos (0707): ao titular, o andamento aprovado; o rascunho e a autoria são da equipe.
+    processos: [{ id: "SEGREDO-proc", advogado_user_id: "SEGREDO-advogado", apelido: "FICA-apelido", numero_cnj: "FICA-cnj" }],
+    andamentos: [{ id: "SEGREDO-and", processo_id: "SEGREDO-proc", texto: "FICA-andamento-aprovado" }],
+    andamentos_da_equipe: [{ id: "SEGREDO-andeq", texto: "SEGREDO-rascunho", criado_por: "SEGREDO-autor" }],
     // A forma de `toolCallsParaOTitular`: passo → chamadas → args. O funcionário da
     // agenda (`owner_user_id`, agendamento.ts) e o do repasse (`target_user_id`,
     // handoff.ts) moram nos argumentos; o termo da busca de contato pode ser o
