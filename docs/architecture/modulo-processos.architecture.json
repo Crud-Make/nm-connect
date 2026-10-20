@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "diagram_type": "architecture",
-  "meta": { "title": "Módulo Processos (advocacia) — banco e trava", "subtitle": "PR 1: as tabelas nascem na instalação do módulo, o andamento aprovado é o texto aprovado (hash no CHECK), e a trava do CPF confere também pelo cadastro do contato. Rotas e telas (PR 2) e a ferramenta da IA (PR 3) ainda não existem", "output": "modulo-processos.html", "quality_profile": "standard" },
+  "meta": { "title": "Módulo Processos (advocacia) — banco e trava", "subtitle": "PR 1: as tabelas nascem na instalação do módulo, o andamento aprovado é o texto aprovado (hash no CHECK), e a trava do CPF confere também pelo cadastro do contato. PR 3: a IA conta ao cliente da conversa o andamento aprovado, depois da trava, e o export do titular leva só o aprovado", "output": "modulo-processos.html", "quality_profile": "standard" },
   "lanes": [
     { "id": "operador", "label": "Administração" },
     { "id": "servidor", "label": "Servidor" },
@@ -22,7 +22,10 @@
     { "id": "verificacoes", "lane": "banco", "col": 6, "type": "database", "label": "verificacoes_de_identidade — connection_id nulo = cadastro (nulls not distinct)" },
     { "id": "trava", "lane": "servidor", "col": 5, "type": "lib", "label": "conferencia-de-cpf.ts (conferirCpfDoContato) + conferencia-de-identidade.ts (concluirConferencia, recusaPelaTravaDoCpf)" },
     { "id": "dadosExternos", "lane": "servidor", "col": 6, "type": "service", "label": "crm_query_external_data / crm_confirm_customer_identity (banco externo, mesma trava)" },
-    { "id": "central", "lane": "operador", "col": 6, "type": "frontend", "label": "Central de avisos — handoff ao bloquear a conferência" }
+    { "id": "central", "lane": "operador", "col": 6, "type": "frontend", "label": "Central de avisos — handoff ao bloquear a conferência" },
+    { "id": "turnoDoAgente", "lane": "servidor", "col": 3, "type": "lib", "label": "turno do agente — pickToolsFromMcp, CONFERENCIA_DA_CONSULTA (lib/ai/runtime/tools.ts)" },
+    { "id": "iaProcessos", "lane": "servidor", "col": 4, "type": "service", "label": "crm_list_processos_do_cliente / crm_confirm_processos_identity (lib/mcp/tools/processos.ts)" },
+    { "id": "exportLgpd", "lane": "servidor", "col": 2, "type": "lib", "label": "export do titular — export-collector.ts + copia-do-titular.ts (só o aprovado vai ao titular)" }
   ],
   "edges": [
     { "id": "e1", "from": "adminModulos", "to": "instalar", "label": "instalar o módulo (recibo idempotente)" },
@@ -41,6 +44,12 @@
     { "id": "e14", "from": "trava", "to": "conferirCpf", "label": "rpc com os 3 dígitos" },
     { "id": "e15", "from": "trava", "to": "verificacoes", "label": "lê e grava a tentativa (conexão ou nula)" },
     { "id": "e16", "from": "trava", "to": "central", "label": "3 erros: bloqueio + aviso" },
-    { "id": "e17", "from": "dadosExternos", "to": "trava", "label": "recusa sem conferência / cauda da conferência" }
+    { "id": "e17", "from": "dadosExternos", "to": "trava", "label": "recusa sem conferência / cauda da conferência" },
+    { "id": "ia1", "from": "turnoDoAgente", "to": "iaProcessos", "label": "consulta ligada ⇒ a conferência de processos entra junto" },
+    { "id": "ia2", "from": "iaProcessos", "to": "trava", "label": "trava pela conexão nula (cadastro); sem CPF ⇒ handoff sem gastar tentativa" },
+    { "id": "ia3", "from": "processos", "to": "iaProcessos", "label": "só os do contato do turno (apelido, área, fase — sem CNJ)" },
+    { "id": "ia4", "from": "andamentos", "to": "iaProcessos", "label": "só status aprovado (texto, aprovado_em)" },
+    { "id": "ia5", "from": "andamentos", "to": "exportLgpd", "label": "aprovado ao titular; rascunho e autoria só à equipe" },
+    { "id": "ia6", "from": "processos", "to": "exportLgpd", "label": "processos do titular (CNJ incluso)" }
   ]
 }
