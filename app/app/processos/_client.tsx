@@ -43,7 +43,7 @@ export function ListaDeProcessos() {
                 <td className="py-2 font-medium">{p.apelido}</td>
                 <td className="py-2 tabular-nums text-text-muted">{p.numero_cnj ?? "—"}</td>
                 <td className="py-2">
-                  <Link href={`/app/contacts/${p.contact_id}`} className="text-accent hover:underline">
+                  <Link href={`/app/contacts/${p.contact_id}?secao=processos`} className="text-accent hover:underline">
                     {rotuloDoContato(p.contacts, t)}
                   </Link>
                 </td>

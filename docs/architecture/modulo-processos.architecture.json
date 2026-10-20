@@ -26,7 +26,7 @@
     { "id": "central", "lane": "operador", "col": 6, "type": "frontend", "label": "Central de avisos — handoff ao bloquear a conferência" },
     { "id": "navProcessos", "lane": "tela", "col": 1, "type": "frontend", "label": "Análise › Ver tudo em Análise › Processos — lib/navigation/catalogo.ts (modulo: processos)" },
     { "id": "listaProcessos", "lane": "tela", "col": 2, "type": "frontend", "label": "/app/processos — layout com gate moduloLigado + lista (apelido, CNJ, cliente, fase)" },
-    { "id": "painelFicha", "lane": "tela", "col": 3, "type": "frontend", "label": "Ficha do contato — ProcessosDoContato / AndamentosDoProcesso (cadastrar, lançar, editar, Aprovar manager+)" },
+    { "id": "painelFicha", "lane": "tela", "col": 3, "type": "frontend", "label": "Ficha do contato, seção Processos (?secao=processos) — ProcessosDoContato / AndamentosDoProcesso (cadastrar, lançar, editar, Aprovar manager+)" },
     { "id": "rotasProcessos", "lane": "servidor", "col": 3, "type": "service", "label": "GET/POST /api/v1/processos (viewer/agent) e /processos/[id]/andamentos (viewer/agent)" },
     { "id": "rotasAndamento", "lane": "servidor", "col": 4, "type": "service", "label": "PATCH /processos/andamentos/[id] (agent) e POST …/aprovar (manager) — pelas RPCs" },
     { "id": "auditoria", "lane": "banco", "col": 2, "type": "database", "label": "api_audit_log — processo.criado, andamento.criado/editado/aprovado (só ids)" }
@@ -50,7 +50,7 @@
     { "id": "e16", "from": "trava", "to": "central", "label": "3 erros: bloqueio + aviso" },
     { "id": "e17", "from": "dadosExternos", "to": "trava", "label": "recusa sem conferência / cauda da conferência" },
     { "id": "e18", "from": "navProcessos", "to": "listaProcessos", "label": "porta só com o módulo instalado" },
-    { "id": "e19", "from": "listaProcessos", "to": "painelFicha", "label": "cada linha leva à ficha do cliente" },
+    { "id": "e19", "from": "listaProcessos", "to": "painelFicha", "label": "cada linha leva à seção Processos da ficha do cliente" },
     { "id": "e20", "from": "listaProcessos", "to": "rotasProcessos", "label": "GET sem contact_id" },
     { "id": "e21", "from": "painelFicha", "to": "rotasProcessos", "label": "GET ?contact_id, POST processo e andamento" },
     { "id": "e22", "from": "painelFicha", "to": "rotasAndamento", "label": "editar rascunho / Aprovar" },
