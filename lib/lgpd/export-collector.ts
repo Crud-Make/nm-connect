@@ -328,6 +328,36 @@ export interface HonorariosParcelaRow {
   financial_entry_id: string | null;
 }
 
+/**
+ * Processos (advocacia) — módulo opcional, ADR-0002 D8. O processo é do contato
+ * (`contact_id` direto), e o número CNJ é dado dele: vai ao titular.
+ */
+export interface ProcessoRow {
+  id: string;
+  numero_cnj: string | null;
+  apelido: string;
+  area: string;
+  fase: string;
+  advogado_user_id: string | null;
+  created_at: string;
+}
+
+/** O andamento que o titular recebe: só o APROVADO, o texto que foi escrito para ele. */
+export interface AndamentoAprovadoRow {
+  id: string;
+  processo_id: string;
+  texto: string;
+  aprovado_em: string | null;
+}
+
+/** Todo andamento, rascunho inclusive, com quem escreveu e quem aprovou: só da equipe. */
+export interface AndamentoDaEquipeRow extends AndamentoAprovadoRow {
+  status: string;
+  criado_por: string | null;
+  aprovado_por: string | null;
+  created_at: string;
+}
+
 export interface AuditRow {
   id: string;
   action: string;
@@ -641,6 +671,10 @@ export interface ExportPayload {
    */
   honorarios_contratos: HonorariosContratoRow[];
   honorarios_parcelas: HonorariosParcelaRow[];
+  /** Módulo opcional de processos: vazio sem o módulo, nunca ausente (o mesmo motivo de honorários). */
+  processos: ProcessoRow[];
+  andamentos: AndamentoAprovadoRow[];
+  andamentos_da_equipe: AndamentoDaEquipeRow[];
   orders: OrderRow[];
   activities: ActivityRow[];
   checkpoints: CheckpointRow[];
@@ -1349,6 +1383,10 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
       }
     }
   }
+
+  const { processos, andamentos, andamentos_da_equipe } = contactId
+    ? await processosDoContato(admin, organizationId, contactId)
+    : { processos: [], andamentos: [], andamentos_da_equipe: [] };
 
   // Orders (contact_id when available, otherwise external_customer_id).
   let orders: OrderRow[] = [];
@@ -2249,6 +2287,9 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     leads,
     honorarios_contratos,
     honorarios_parcelas,
+    processos,
+    andamentos,
+    andamentos_da_equipe,
     orders,
     activities,
     checkpoints,
@@ -2287,6 +2328,54 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
  * O que só existe no documento FORA do Brasil: o rótulo da citação e o fuso.
  * Para o Brasil devolve `{}` — nenhuma chave nova no `data.json` (doc 88).
  */
+/**
+ * Processos — módulo opcional (ADR-0002 D8), com o molde de honorários: sem o
+ * módulo a tabela não existe (42P01 no Postgres, PGRST205 pelo PostgREST) e o
+ * bloco sai vazio; qualquer OUTRO erro lança, e o worker tenta de novo em vez de
+ * entregar um export sem os processos como se fosse completo.
+ *
+ * Uma leitura dos andamentos, duas seções: `andamentos` (só o aprovado, sem
+ * autoria) vai ao titular; `andamentos_da_equipe` (rascunho e autoria) fica com
+ * a equipe (`SECOES_DA_EQUIPE` em `copia-do-titular.ts`).
+ */
+async function processosDoContato(
+  admin: ReturnType<typeof createAdminClient>,
+  organizationId: string,
+  contactId: string,
+): Promise<Pick<ExportPayload, "processos" | "andamentos" | "andamentos_da_equipe">> {
+  const vazio = { processos: [], andamentos: [], andamentos_da_equipe: [] };
+  const semModulo = (code?: string) => code === "42P01" || code === "PGRST205";
+
+  const { data: processos, error } = await admin
+    .from("processos")
+    .select("id, numero_cnj, apelido, area, fase, advogado_user_id, created_at")
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .order("created_at", { ascending: true });
+  if (error) {
+    if (semModulo(error.code)) return vazio;
+    throw new Error(`processos_load_failed: ${error.message}`);
+  }
+  if (!processos?.length) return vazio;
+
+  const { data: linhas, error: erroAndamentos } = await admin
+    .from("andamentos")
+    .select("id, processo_id, texto, status, criado_por, aprovado_por, aprovado_em, created_at")
+    .eq("organization_id", organizationId)
+    .in("processo_id", processos.map((p) => p.id))
+    .order("created_at", { ascending: true });
+  if (erroAndamentos) throw new Error(`andamentos_load_failed: ${erroAndamentos.message}`);
+
+  const andamentos_da_equipe: AndamentoDaEquipeRow[] = linhas ?? [];
+  return {
+    processos,
+    andamentos: andamentos_da_equipe
+      .filter((a) => a.status === "aprovado")
+      .map(({ id, processo_id, texto, aprovado_em }) => ({ id, processo_id, texto, aprovado_em })),
+    andamentos_da_equipe,
+  };
+}
+
 function foraDoBrasil(
   perfil: PerfilDoPais,
   controlador: Controlador,
@@ -2439,6 +2528,9 @@ function emptyPayload(
     leads: [],
     honorarios_contratos: [],
     honorarios_parcelas: [],
+    processos: [],
+    andamentos: [],
+    andamentos_da_equipe: [],
     orders: [],
     activities: [],
     checkpoints: [],

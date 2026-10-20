@@ -3,7 +3,8 @@
  * sua seção de export, mesmo sem estar na cascata de redação — honorários não
  * tem texto livre sobre a pessoa (é parâmetro financeiro e calendário), então
  * `tests/unit/lgpd-exporta-o-que-redige.test.ts` (que deriva a lista do que se
- * REDIGE) nunca cobriria esta lacuna. Este arquivo prova a seção diretamente.
+ * REDIGE) nunca cobriria esta lacuna. Este arquivo prova a seção diretamente —
+ * a de honorários e, com o mesmo banco falso, a de processos (0707).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -25,8 +26,9 @@ const request = {
   externalCustomerId: null,
 };
 let rows: Record<string, Row[]>;
-/** 42P01 só para as duas tabelas do módulo — simula instalação sem o módulo. */
+/** 42P01 só para as tabelas de módulo — simula instalação sem os módulos. */
 let moduloDesinstalado: boolean;
+const TABELAS_DE_MODULO = ["honorarios_contratos", "honorarios_parcelas", "processos", "andamentos"];
 /** Erro de leitura que NÃO é "tabela inexistente" numa das tabelas do módulo. */
 let falhaDeLeitura: string | null;
 
@@ -73,10 +75,7 @@ class ReadQuery {
     if (falhaDeLeitura === this.table) {
       return { data: null, error: { code: "57014", message: "canceling statement due to statement timeout" } };
     }
-    if (
-      moduloDesinstalado &&
-      (this.table === "honorarios_contratos" || this.table === "honorarios_parcelas")
-    ) {
+    if (moduloDesinstalado && TABELAS_DE_MODULO.includes(this.table)) {
       return { data: null, error: { code: "42P01", message: "relation does not exist" } };
     }
     const data = (rows[this.table] ?? [])
@@ -202,6 +201,51 @@ describe("LGPD: honorários no pedido de acesso (ADR-0002 D8)", () => {
     async (tabela) => {
       falhaDeLeitura = tabela;
       await expect(collectExportData(request)).rejects.toThrow(/honorarios_.*_load_failed/);
+    },
+  );
+});
+
+describe("LGPD: processos no pedido de acesso (ADR-0002 D8, 0707)", () => {
+  beforeEach(() => {
+    rows.processos = [
+      { id: "proc-a", organization_id: ORG, contact_id: CONTACT, numero_cnj: "0000001-00.2026.8.13.0001", apelido: "O divórcio", area: "familia", fase: "conhecimento", advogado_user_id: "adv-1", created_at: "2026-09-16T00:00:00Z" },
+      { id: "proc-de-outro", organization_id: ORG, contact_id: "contact-b", apelido: "De outro", area: "civel", fase: "recurso", created_at: "2026-09-16T00:00:00Z" },
+    ];
+    rows.andamentos = [
+      { id: "and-aprovado", organization_id: ORG, processo_id: "proc-a", texto: "Audiência marcada.", status: "aprovado", criado_por: "u-1", aprovado_por: "u-2", aprovado_em: "2026-10-01T00:00:00Z", created_at: "2026-09-30T00:00:00Z" },
+      { id: "and-rascunho", organization_id: ORG, processo_id: "proc-a", texto: "rascunho interno", status: "rascunho", criado_por: "u-1", aprovado_por: null, aprovado_em: null, created_at: "2026-10-02T00:00:00Z" },
+      { id: "and-de-outro", organization_id: ORG, processo_id: "proc-de-outro", texto: "de outro", status: "aprovado", criado_por: "u-1", aprovado_por: "u-2", aprovado_em: "2026-10-01T00:00:00Z", created_at: "2026-09-30T00:00:00Z" },
+    ];
+  });
+
+  it("ao titular, só os processos dele e o andamento APROVADO, sem autoria", async () => {
+    const payload = await collectExportData(request);
+    expect(payload.processos.map((p) => p.id)).toEqual(["proc-a"]);
+    expect(payload.andamentos).toEqual([
+      { id: "and-aprovado", processo_id: "proc-a", texto: "Audiência marcada.", aprovado_em: "2026-10-01T00:00:00Z" },
+    ]);
+  });
+
+  it("à equipe, o rascunho e quem escreveu e aprovou", async () => {
+    const payload = await collectExportData(request);
+    expect(payload.andamentos_da_equipe.map((a) => [a.id, a.status, a.criado_por, a.aprovado_por])).toEqual([
+      ["and-aprovado", "aprovado", "u-1", "u-2"],
+      ["and-rascunho", "rascunho", "u-1", null],
+    ]);
+  });
+
+  it("módulo não instalado (42P01) → seções vazias, export não quebra", async () => {
+    moduloDesinstalado = true;
+    const payload = await collectExportData(request);
+    expect([payload.processos, payload.andamentos, payload.andamentos_da_equipe]).toEqual([[], [], []]);
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it.each(["processos", "andamentos"])(
+    "módulo instalado e %s ilegível → o export falha e é retentado",
+    async (tabela) => {
+      falhaDeLeitura = tabela;
+      await expect(collectExportData(request)).rejects.toThrow(/(processos|andamentos)_load_failed/);
     },
   );
 });

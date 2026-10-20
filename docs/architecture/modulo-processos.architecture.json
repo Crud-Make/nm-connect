@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "diagram_type": "architecture",
-  "meta": { "title": "Módulo Processos (advocacia) — banco, rotas e telas", "subtitle": "PR 1: as tabelas nascem na instalação do módulo, o andamento aprovado é o texto aprovado (hash no CHECK), e a trava do CPF confere também pelo cadastro do contato. PR 2: rotas /api/v1/processos, a lista /app/processos e o painel na ficha do contato. A ferramenta da IA (PR 3) ainda não existe", "output": "modulo-processos.html", "quality_profile": "standard" },
+  "meta": { "title": "Módulo Processos (advocacia) — banco, telas e IA", "subtitle": "PR 1: as tabelas nascem na instalação do módulo, o andamento aprovado é o texto aprovado (hash no CHECK), e a trava do CPF confere também pelo cadastro do contato. PR 2: rotas /api/v1/processos, a lista /app/processos e o painel na ficha do contato. PR 3: a IA conta ao cliente da conversa o andamento aprovado, depois da trava, e o export do titular leva só o aprovado", "output": "modulo-processos.html", "quality_profile": "standard" },
   "lanes": [
     { "id": "operador", "label": "Administração" },
     { "id": "tela", "label": "Tela do operador" },
@@ -29,7 +29,10 @@
     { "id": "painelFicha", "lane": "tela", "col": 3, "type": "frontend", "label": "Ficha do contato, seção Processos (?secao=processos) — ProcessosDoContato / AndamentosDoProcesso (cadastrar, lançar, editar, Aprovar manager+)" },
     { "id": "rotasProcessos", "lane": "servidor", "col": 3, "type": "service", "label": "GET/POST /api/v1/processos (viewer/agent) e /processos/[id]/andamentos (viewer/agent)" },
     { "id": "rotasAndamento", "lane": "servidor", "col": 4, "type": "service", "label": "PATCH /processos/andamentos/[id] (agent) e POST …/aprovar (manager) — pelas RPCs" },
-    { "id": "auditoria", "lane": "banco", "col": 2, "type": "database", "label": "api_audit_log — processo.criado, andamento.criado/editado/aprovado (só ids)" }
+    { "id": "auditoria", "lane": "banco", "col": 2, "type": "database", "label": "api_audit_log — processo.criado, andamento.criado/editado/aprovado (só ids)" },
+    { "id": "turnoDoAgente", "lane": "servidor", "col": 3, "type": "lib", "label": "turno do agente — pickToolsFromMcp, CONFERENCIA_DA_CONSULTA (lib/ai/runtime/tools.ts)" },
+    { "id": "iaProcessos", "lane": "servidor", "col": 4, "type": "service", "label": "crm_list_processos_do_cliente / crm_confirm_processos_identity (lib/mcp/tools/processos.ts)" },
+    { "id": "exportLgpd", "lane": "servidor", "col": 2, "type": "lib", "label": "export do titular — export-collector.ts + copia-do-titular.ts (só o aprovado vai ao titular)" }
   ],
   "edges": [
     { "id": "e1", "from": "adminModulos", "to": "instalar", "label": "instalar o módulo (recibo idempotente)" },
@@ -58,6 +61,12 @@
     { "id": "e24", "from": "rotasProcessos", "to": "andamentos", "label": "rascunho com criado_por" },
     { "id": "e25", "from": "rotasAndamento", "to": "aprovar", "label": "rpc com p_org da sessão" },
     { "id": "e26", "from": "rotasProcessos", "to": "auditoria", "label": "processo.criado / andamento.criado" },
-    { "id": "e27", "from": "rotasAndamento", "to": "auditoria", "label": "andamento.editado / andamento.aprovado" }
+    { "id": "e27", "from": "rotasAndamento", "to": "auditoria", "label": "andamento.editado / andamento.aprovado" },
+    { "id": "ia1", "from": "turnoDoAgente", "to": "iaProcessos", "label": "consulta ligada ⇒ a conferência de processos entra junto" },
+    { "id": "ia2", "from": "iaProcessos", "to": "trava", "label": "trava pela conexão nula (cadastro); sem CPF ⇒ handoff sem gastar tentativa" },
+    { "id": "ia3", "from": "processos", "to": "iaProcessos", "label": "só os do contato do turno (apelido, área, fase — sem CNJ)" },
+    { "id": "ia4", "from": "andamentos", "to": "iaProcessos", "label": "só status aprovado (texto, aprovado_em)" },
+    { "id": "ia5", "from": "andamentos", "to": "exportLgpd", "label": "aprovado ao titular; rascunho e autoria só à equipe" },
+    { "id": "ia6", "from": "processos", "to": "exportLgpd", "label": "processos do titular (CNJ incluso)" }
   ]
 }

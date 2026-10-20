@@ -101,6 +101,7 @@ export const ESCOPO_DAS_ESCRITAS: Readonly<Record<string, Readonly<Record<string
   // A trava do CPF (#18): o único argumento são os dígitos; o contato é o do
   // turno, lido do contexto pelo handler — não há campo que aponte para outro.
   crm_confirm_customer_identity: {},
+  crm_confirm_processos_identity: {},
 };
 
 export type VereditoDaEscrita =

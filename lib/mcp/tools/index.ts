@@ -54,6 +54,7 @@ import { crmListContactOrders, crmSearchProducts } from "./comercio";
 import { crmGetHonorariosContrato, crmListHonorariosParcelas } from "./honorarios";
 import { crmDescribeExternalData, crmQueryExternalData } from "./dados-externos";
 import { crmConfirmCustomerIdentity } from "./conferencia-de-identidade";
+import { crmConfirmProcessosIdentity, crmListProcessosDoCliente } from "./processos";
 import { crmListPrivacyRequests } from "./privacidade";
 import {
   crmArchiveStage,
@@ -128,6 +129,8 @@ export const allTools: ReadonlyArray<McpToolDefinition> = [
   crmDescribeExternalData,
   crmQueryExternalData,
   crmConfirmCustomerIdentity,
+  crmListProcessosDoCliente,
+  crmConfirmProcessosIdentity,
   crmListPrivacyRequests,
   // read — organizar a operação (W4)
   crmListStages,

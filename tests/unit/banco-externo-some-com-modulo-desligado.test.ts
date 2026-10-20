@@ -24,11 +24,11 @@ const NOMES = ["crm_describe_external_data", "crm_query_external_data"] as const
 /** A trava do CPF (#18): entra sozinha junto com a busca, e some com o módulo como as outras. */
 const CONFERENCIA = "crm_confirm_customer_identity";
 
-function montar(modulosLigados: Array<"banco_externo">) {
+function montar(modulosLigados: Array<"banco_externo" | "processos">, toolIds: readonly string[] = NOMES) {
   const ator = { type: "ai_agent", id: "ag-1", role: "ai_operator" };
   const supabase = {} as never;
   return pickToolsFromMcp({
-    toolIds: [...NOMES],
+    toolIds: [...toolIds],
     auth: {
       organizationId: ORG,
       role: "ai_operator",
@@ -73,5 +73,19 @@ describe("banco_externo desligado: as ferramentas não chegam ao modelo", () => 
 
   it("controle: com o módulo ligado as duas chegam, e a conferência de CPF vem junto com a busca", () => {
     expect(Object.keys(montar(["banco_externo"])).sort()).toEqual([...NOMES, CONFERENCIA].sort());
+  });
+});
+
+/** A mesma trava, na consulta de processos: a conferência pelo CADASTRO vem junto (mapa em `tools.ts`). */
+describe("processos: a conferência anda com a consulta, e some com o módulo", () => {
+  const CONSULTA = "crm_list_processos_do_cliente";
+  const CONFERENCIA_DE_PROCESSOS = "crm_confirm_processos_identity";
+
+  it("com o módulo ligado, a consulta chega com a SUA conferência — e não com a do banco externo", () => {
+    expect(Object.keys(montar(["processos"], [CONSULTA])).sort()).toEqual([CONFERENCIA_DE_PROCESSOS, CONSULTA]);
+  });
+
+  it("com o módulo desligado, nenhuma das duas", () => {
+    expect(Object.keys(montar([], [CONSULTA]))).toEqual([]);
   });
 });
