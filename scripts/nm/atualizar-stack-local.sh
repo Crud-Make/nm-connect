@@ -13,6 +13,8 @@ COMPOSE=(docker compose -f docker-compose.local.yml -f docker-compose.local.nm.y
   --env-file "${LOCAL_ENV_FILE:-.env.local}")
 SERVICOS=(app worker scheduler)
 
+# As chaves de cifra vivem no banco; um banco recriado volta sem elas.
+./scripts/local-stack.sh chaves
 "${COMPOSE[@]}" pull "${SERVICOS[@]}"
 # Sem `--no-build`, um pull que falha no `up` (rede, pacote privado) cai no
 # `build:` do local.yml e compila tudo nesta máquina.

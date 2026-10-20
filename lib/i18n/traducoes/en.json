@@ -7027,6 +7027,8 @@
   "status inválido.": "Invalid status.",
   "Contato anonimizado — edição bloqueada (LGPD).": "Anonymized contact — editing blocked (LGPD).",
   "Nenhum campo para atualizar.": "No field to update.",
+  "Não foi possível guardar o CPF: a cifra do CPF não está configurada nesta instalação.": "Couldn't save the CPF: CPF encryption isn't configured on this installation.",
+  "Já cadastrado — deixe em branco para manter.": "Already on file — leave blank to keep it.",
   "Contato não encontrado após update.": "Contact not found after update.",
   "Não foi possível excluir: o contato ainda tem registros vinculados.": "Couldn't delete: the contact still has linked records.",
   "Um lead tem um dono: informe owner_user_id OU owner_agent_id.": "A lead has one owner: provide owner_user_id OR owner_agent_id.",
