@@ -58,6 +58,8 @@ import { BasesDoAgente, type MaterialDoAcervo } from "./BasesDoAgente";
 import { FunisDoAgente, type CoberturaPorFunil } from "./FunisDoAgente";
 import { PublishConfirmDialog } from "./PublishConfirmDialog";
 import { ComandosDoCelular } from "./ComandosDoCelular";
+import { RespostaEmAudio } from "./RespostaEmAudio";
+import { VOZ_PADRAO } from "@/lib/messaging/voz/vozes";
 import {
   saveAgentDraftAction,
   publishAgentAction,
@@ -193,6 +195,11 @@ interface FormState {
    * jurídica". Padrão LIGADO (`?? true` abaixo), como a coluna na versão.
    */
   handoff_legal_enabled: boolean;
+  /** Responder áudio com áudio (0704). Padrão DESLIGADO. */
+  voice_reply_enabled: boolean;
+  voice_reply_voice: string;
+  /** "" = sem instrução de tom (vira null no payload). */
+  voice_reply_instructions: string;
   proposal_ai_draft_enabled: boolean;
   cases_enabled: boolean;
   split_messages: boolean;
@@ -304,6 +311,9 @@ export function buildState(args: {
     ],
     handoff_tool_enabled: version?.handoff_tool_enabled ?? true,
     handoff_legal_enabled: version?.handoff_legal_enabled ?? true,
+    voice_reply_enabled: version?.voice_reply_enabled ?? false,
+    voice_reply_voice: version?.voice_reply_voice ?? VOZ_PADRAO,
+    voice_reply_instructions: version?.voice_reply_instructions ?? "",
     proposal_ai_draft_enabled: version?.proposal_ai_draft_enabled ?? true,
     cases_enabled: version?.cases_enabled ?? false,
     split_messages: version?.split_messages ?? false,
@@ -369,6 +379,9 @@ function toVersionPayload(s: FormState) {
     handoff_keywords: s.handoff_keywords,
     handoff_tool_enabled: s.handoff_tool_enabled,
     handoff_legal_enabled: s.handoff_legal_enabled,
+    voice_reply_enabled: s.voice_reply_enabled,
+    voice_reply_voice: s.voice_reply_voice,
+    voice_reply_instructions: s.voice_reply_instructions.trim() === "" ? null : s.voice_reply_instructions.trim(),
     proposal_ai_draft_enabled: s.proposal_ai_draft_enabled,
     cases_enabled: s.cases_enabled,
     split_messages: s.split_messages,
@@ -1235,6 +1248,17 @@ export function AgentForm(props: Props) {
               </div>
             ) : null}
           </Card>
+
+          {/* Resposta em nota de voz (0704) */}
+          <RespostaEmAudio
+            value={{
+              voice_reply_enabled: form.voice_reply_enabled,
+              voice_reply_voice: form.voice_reply_voice,
+              voice_reply_instructions: form.voice_reply_instructions,
+            }}
+            onChange={patch}
+            disabled={disabled}
+          />
 
           {/* Capacidades */}
           <Card className="space-y-2 p-4">
