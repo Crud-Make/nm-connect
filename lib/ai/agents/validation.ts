@@ -12,6 +12,7 @@ import { ehToolIdRemoto } from "@/lib/mcp/servidor-externo/ids";
 import { VALID_TOOL_IDS } from "@/lib/mcp/tools/catalog";
 import { TETO_TOOLS_POR_AGENTE } from "@/lib/mcp/tools/selecao-por-pacote";
 import { IDS_DE_PROVEDOR } from "@/lib/ai/pontos/provedores";
+import { LIMITE_DA_INSTRUCAO_DE_TOM, VOZ_PADRAO, VOZES_DE_FALA } from "@/lib/messaging/voz/vozes";
 
 /**
  * Derivado de `lib/ai/pontos/provedores.ts` (a lista única desde a 0127). Como
@@ -179,6 +180,18 @@ const versionShapeSchema = z
     // `true` porque quem não mexer tem de ficar com o resultado de hoje; o
     // efeito da chave (trocar a descrição da ferramenta) mora no turno.
     handoff_legal_enabled: z.boolean().default(true),
+    // Responder áudio com áudio (migration 0677) — DESLIGADO por padrão: quem
+    // não mexer continua recebendo texto. A voz é da lista da OpenAI
+    // (`lib/messaging/voz/vozes.ts`); a instrução só muda o tom, nunca o que é dito.
+    voice_reply_enabled: z.boolean().default(false),
+    voice_reply_voice: z.enum(VOZES_DE_FALA).default(VOZ_PADRAO),
+    voice_reply_instructions: z
+      .string()
+      .trim()
+      .max(LIMITE_DA_INSTRUCAO_DE_TOM)
+      .nullable()
+      .default(null)
+      .transform((v) => (v === "" ? null : v)),
     proposal_ai_draft_enabled: z.boolean().default(true),
     cases_enabled: z.boolean().default(false),
     // Onda 4 — quebra a resposta em bolhas curtas (splitIntoBubbles) espaçadas
@@ -267,6 +280,14 @@ export const versionPatchSchema = versionShapeSchema
     handoff_keywords: versionShapeSchema.shape.handoff_keywords.removeDefault(),
     handoff_tool_enabled: versionShapeSchema.shape.handoff_tool_enabled.removeDefault(),
     handoff_legal_enabled: versionShapeSchema.shape.handoff_legal_enabled.removeDefault(),
+    voice_reply_enabled: versionShapeSchema.shape.voice_reply_enabled.removeDefault(),
+    voice_reply_voice: versionShapeSchema.shape.voice_reply_voice.removeDefault(),
+    voice_reply_instructions: z
+      .string()
+      .trim()
+      .max(LIMITE_DA_INSTRUCAO_DE_TOM)
+      .nullable()
+      .transform((v) => (v === "" ? null : v)),
     proposal_ai_draft_enabled: versionShapeSchema.shape.proposal_ai_draft_enabled.removeDefault(),
     cases_enabled: versionShapeSchema.shape.cases_enabled.removeDefault(),
     split_messages: versionShapeSchema.shape.split_messages.removeDefault(),

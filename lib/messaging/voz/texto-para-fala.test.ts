@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  LIMITE_DE_CARACTERES_FALADOS,
-  numeroPorExtenso,
-  textoParaFala,
-} from "./texto-para-fala";
+import { LIMITE_DE_CARACTERES_FALADOS, numeroPorExtenso, textoParaFala } from "./texto-para-fala";
 
 function falado(texto: string, apelidos?: ReadonlyMap<string, string>): string {
   const r = textoParaFala(texto, apelidos ? { apelidos } : {});
@@ -65,13 +61,17 @@ describe("textoParaFala — o que o cliente ouve", () => {
   });
 
   it("lê valor em reais por extenso", () => {
-    expect(falado("Os honorários são R$ 1.500,00.")).toBe("Os honorários são mil e quinhentos reais.");
+    expect(falado("Os honorários são R$ 1.500,00.")).toBe(
+      "Os honorários são mil e quinhentos reais.",
+    );
     expect(falado("Custa R$ 1,50.")).toBe("Custa um real e cinquenta centavos.");
     expect(falado("Taxa de R$0,90")).toBe("Taxa de noventa centavos");
   });
 
   it("lê porcentagem e hora", () => {
-    expect(falado("Desconto de 10% às 14h30.")).toBe("Desconto de dez por cento às catorze e trinta.");
+    expect(falado("Desconto de 10% às 14h30.")).toBe(
+      "Desconto de dez por cento às catorze e trinta.",
+    );
     expect(falado("Abrimos às 9h e fechamos às 18:00.")).toBe(
       "Abrimos às nove horas e fechamos às dezoito horas.",
     );

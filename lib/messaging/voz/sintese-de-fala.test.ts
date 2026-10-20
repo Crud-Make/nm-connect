@@ -38,8 +38,11 @@ function oggOpus(segundos: number, preSkip = 312): Uint8Array {
   return out;
 }
 
-function resposta(corpo: BodyInit | null, status = 200): Response {
-  return new Response(corpo, { status, headers: { "content-type": "audio/ogg" } });
+function resposta(corpo: Uint8Array, status = 200): Response {
+  return new Response(corpo as unknown as BodyInit, {
+    status,
+    headers: { "content-type": "audio/ogg" },
+  });
 }
 
 describe("duracaoDoOggOpus", () => {
@@ -82,8 +85,16 @@ describe("sintetizarFala — o pedido à OpenAI", () => {
 
   it("voz desconhecida cai na padrão; instrução vazia não vai", async () => {
     const fetchDuble = vi.fn(async () => resposta(oggOpus(1)));
-    await sintetizarFala({ apiKey: "k", texto: "Oi", voz: "robozinho", instrucoes: "  ", fetch: fetchDuble });
-    const corpo = JSON.parse((fetchDuble.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    await sintetizarFala({
+      apiKey: "k",
+      texto: "Oi",
+      voz: "robozinho",
+      instrucoes: "  ",
+      fetch: fetchDuble,
+    });
+    const corpo = JSON.parse(
+      (fetchDuble.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
+    );
     expect(corpo.voice).toBe(VOZ_PADRAO);
     expect(corpo).not.toHaveProperty("instructions");
   });

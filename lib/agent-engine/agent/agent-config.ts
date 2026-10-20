@@ -45,6 +45,14 @@ export interface PublishedAgentConfig {
    * Consumidor: `inbound-turn.ts` (a descrição da ferramenta de passagem).
    */
   handoffLegalEnabled?: boolean;
+  /**
+   * Responder áudio com áudio (migration 0677): quando a mensagem do cliente
+   * que abriu o turno é nota de voz, o texto APROVADO pela cadeia before_send
+   * sai como nota de voz. Opcional pelo mesmo motivo de `handoffLegalEnabled`;
+   * ausente = desligado, que é o padrão do banco. Consumidor: `inbound-turn.ts`
+   * via `lib/messaging/voz/resposta-em-audio.ts`.
+   */
+  voiceReply?: { enabled: boolean; voice: string | null; instructions: string | null };
   proposalAiDraftEnabled: boolean;
   splitMessages: boolean;
   splitMaxChars: number;
@@ -131,6 +139,9 @@ interface Row {
   handoff_keywords: string[] | null;
   handoff_tool_enabled: boolean;
   handoff_legal_enabled: boolean;
+  voice_reply_enabled: boolean | null;
+  voice_reply_voice: string | null;
+  voice_reply_instructions: string | null;
   proposal_ai_draft_enabled: boolean;
   split_messages: boolean;
   split_max_chars: number;
@@ -164,6 +175,9 @@ const SELECT_AGENT_CONFIG_COLUMNS = `a.operation_mode,a.paused_at,a.operation_re
             v.handoff_keywords,
             v.handoff_tool_enabled,
             v.handoff_legal_enabled,
+            v.voice_reply_enabled,
+            v.voice_reply_voice,
+            v.voice_reply_instructions,
             v.proposal_ai_draft_enabled,
             v.split_messages,
             v.split_max_chars,
@@ -221,6 +235,11 @@ function mapAgentConfigRow(r: Row): PublishedAgentConfig {
     handoffKeywords: palavrasDePassagem(r.handoff_keywords),
     handoffToolEnabled: r.handoff_tool_enabled,
     handoffLegalEnabled: r.handoff_legal_enabled,
+    voiceReply: {
+      enabled: r.voice_reply_enabled === true,
+      voice: r.voice_reply_voice ?? null,
+      instructions: r.voice_reply_instructions ?? null,
+    },
     proposalAiDraftEnabled: r.proposal_ai_draft_enabled,
     splitMessages: r.split_messages,
     splitMaxChars: r.split_max_chars,

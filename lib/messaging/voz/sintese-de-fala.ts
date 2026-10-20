@@ -25,30 +25,17 @@
  */
 import { costCents } from "@/lib/agent-engine/edge/llm/pricing";
 
+import { LIMITE_DA_INSTRUCAO_DE_TOM, vozValida } from "./vozes";
+
+export {
+  LIMITE_DA_INSTRUCAO_DE_TOM,
+  VOZ_PADRAO,
+  VOZES_DE_FALA,
+  vozValida,
+  type VozDeFala,
+} from "./vozes";
+
 export const MODELO_DE_FALA = "gpt-4o-mini-tts";
-
-/** As vozes embutidas do `gpt-4o-mini-tts`, na ordem da doc oficial. */
-export const VOZES_DE_FALA = [
-  "alloy",
-  "ash",
-  "ballad",
-  "coral",
-  "echo",
-  "fable",
-  "nova",
-  "onyx",
-  "sage",
-  "shimmer",
-  "verse",
-  "marin",
-  "cedar",
-] as const;
-export type VozDeFala = (typeof VOZES_DE_FALA)[number];
-
-export const VOZ_PADRAO: VozDeFala = "marin";
-
-/** Teto da instrução de tom guardada na versão do agente (o CHECK do banco repete). */
-export const LIMITE_DA_INSTRUCAO_DE_TOM = 500;
 
 /**
  * Quanto o turno espera a voz. Acima disso o texto aprovado sai como texto: o
@@ -58,14 +45,16 @@ export const PRAZO_DA_SINTESE_MS = 20_000;
 
 const ENDERECO = "https://api.openai.com/v1/audio/speech";
 
-export function vozValida(v: string | null | undefined): VozDeFala {
-  return (VOZES_DE_FALA as readonly string[]).includes(v ?? "") ? (v as VozDeFala) : VOZ_PADRAO;
-}
-
 export type MotivoDaFalhaDaSintese = "prazo_esgotado" | "rede" | "erro_da_api" | "formato_invalido";
 
 export type ResultadoDaSintese =
-  | { ok: true; audio: Uint8Array; mime: "audio/ogg"; duracaoSeg: number | null; latenciaMs: number }
+  | {
+      ok: true;
+      audio: Uint8Array;
+      mime: "audio/ogg";
+      duracaoSeg: number | null;
+      latenciaMs: number;
+    }
   | {
       ok: false;
       motivo: MotivoDaFalhaDaSintese;
@@ -115,7 +104,13 @@ export async function sintetizarFala(entrada: {
   if (!res.ok) {
     // O corpo do erro da OpenAI não traz a chave; mesmo assim, só um trecho curto.
     const detalhe = (await res.text().catch(() => "")).slice(0, 200);
-    return { ok: false, motivo: "erro_da_api", status: res.status, detalhe, latenciaMs: Date.now() - inicio };
+    return {
+      ok: false,
+      motivo: "erro_da_api",
+      status: res.status,
+      detalhe,
+      latenciaMs: Date.now() - inicio,
+    };
   }
   let audio: Uint8Array;
   try {
@@ -136,7 +131,13 @@ export async function sintetizarFala(entrada: {
       latenciaMs: Date.now() - inicio,
     };
   }
-  return { ok: true, audio, mime: "audio/ogg", duracaoSeg: duracaoDoOggOpus(audio), latenciaMs: Date.now() - inicio };
+  return {
+    ok: true,
+    audio,
+    mime: "audio/ogg",
+    duracaoSeg: duracaoDoOggOpus(audio),
+    latenciaMs: Date.now() - inicio,
+  };
 }
 
 // ─── Ogg/Opus ───────────────────────────────────────────────────────────────

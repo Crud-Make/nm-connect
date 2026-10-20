@@ -23,7 +23,8 @@
  */
 export const LIMITE_DE_CARACTERES_FALADOS = 900;
 
-export type MotivoDeNaoFalar = "vazio" | "link_na_resposta" | "processo_sem_apelido" | "longo_demais";
+export type MotivoDeNaoFalar =
+  "vazio" | "link_na_resposta" | "processo_sem_apelido" | "longo_demais";
 
 export type TextoFalavel = { ok: true; texto: string } | { ok: false; motivo: MotivoDeNaoFalar };
 
@@ -42,11 +43,40 @@ type Genero = "masculino" | "feminino";
 
 const UNIDADES = ["zero", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
 const DEZ_A_DEZENOVE = [
-  "dez", "onze", "doze", "treze", "catorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove",
+  "dez",
+  "onze",
+  "doze",
+  "treze",
+  "catorze",
+  "quinze",
+  "dezesseis",
+  "dezessete",
+  "dezoito",
+  "dezenove",
 ];
-const DEZENAS = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"];
+const DEZENAS = [
+  "",
+  "",
+  "vinte",
+  "trinta",
+  "quarenta",
+  "cinquenta",
+  "sessenta",
+  "setenta",
+  "oitenta",
+  "noventa",
+];
 const CENTENAS = [
-  "", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos",
+  "",
+  "cento",
+  "duzentos",
+  "trezentos",
+  "quatrocentos",
+  "quinhentos",
+  "seiscentos",
+  "setecentos",
+  "oitocentos",
+  "novecentos",
 ];
 
 function unidade(n: number, genero: Genero): string {
@@ -94,9 +124,7 @@ export function numeroPorExtenso(n: number, genero: Genero = "masculino"): strin
     { valor: Math.floor(n / 1000) % 1000, nome: () => "mil" },
     { valor: n % 1000, nome: () => "" },
   ];
-  const ditos = grupos
-    .map((g, i) => ({ ...g, i }))
-    .filter((g) => g.valor > 0);
+  const ditos = grupos.map((g, i) => ({ ...g, i })).filter((g) => g.valor > 0);
   const partes: string[] = [];
   ditos.forEach((g, idx) => {
     // "mil", nunca "um mil"; milhão e bilhão são masculinos ("dois milhões").
@@ -121,8 +149,18 @@ export function numeroPorExtenso(n: number, genero: Genero = "masculino"): strin
 // ─── as trocas de forma ─────────────────────────────────────────────────────
 
 const MESES = [
-  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
 ];
 
 const CNJ = /\b\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}\b/g;
@@ -135,7 +173,8 @@ function dia(n: number): string {
 function reais(inteiro: number, centavos: number): string {
   const partes: string[] = [];
   if (inteiro > 0) partes.push(`${numeroPorExtenso(inteiro)} ${inteiro === 1 ? "real" : "reais"}`);
-  if (centavos > 0) partes.push(`${numeroPorExtenso(centavos)} ${centavos === 1 ? "centavo" : "centavos"}`);
+  if (centavos > 0)
+    partes.push(`${numeroPorExtenso(centavos)} ${centavos === 1 ? "centavo" : "centavos"}`);
   if (partes.length === 0) return "zero real";
   return partes.join(" e ");
 }
@@ -166,7 +205,10 @@ function semEmoji(t: string): string {
 
 /** Cada item de lista vira uma frase; quebras de linha viram espaço. */
 function semLista(t: string): string {
-  const linhas = t.split(/\r?\n/).map((l) => l.trim()).filter((l) => l !== "");
+  const linhas = t
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l !== "");
   const frases = linhas.map((linha) => {
     const item = linha.match(/^(?:[-*•–]|\d{1,2}[.)])\s+(.*)$/);
     if (!item) return { texto: linha, item: false };
@@ -184,7 +226,8 @@ function processosPorApelido(t: string, apelidos: ReadonlyMap<string, string>): 
     /\s*\(\s*(?:o\s+)?(?:processo\s*)?(?:n[º°o.]*\s*)?(\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4})\s*\)/gi,
     (todo, cnj: string, offset: number) => {
       const apelido = apelidos.get(cnj);
-      if (apelido && semNumero.slice(0, offset).toLowerCase().includes(apelido.toLowerCase())) return "";
+      if (apelido && semNumero.slice(0, offset).toLowerCase().includes(apelido.toLowerCase()))
+        return "";
       return todo;
     },
   );
@@ -211,20 +254,26 @@ function formasFaladas(t: string): string {
         reais(Number(int.replace(/\./g, "")), cent ? Number(cent) : 0),
       )
       // 15/03/2026 e 01/12
-      .replace(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/g, (todo, d: string, m: string, a?: string) => {
-        const nd = Number(d);
-        const nm = Number(m);
-        if (nd < 1 || nd > 31 || nm < 1 || nm > 12) return todo;
-        const base = `${dia(nd)} de ${MESES[nm - 1]}`;
-        return a ? `${base} de ${numeroPorExtenso(Number(a))}` : base;
-      })
+      .replace(
+        /\b(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?\b/g,
+        (todo, d: string, m: string, a?: string) => {
+          const nd = Number(d);
+          const nm = Number(m);
+          if (nd < 1 || nd > 31 || nm < 1 || nm > 12) return todo;
+          const base = `${dia(nd)} de ${MESES[nm - 1]}`;
+          return a ? `${base} de ${numeroPorExtenso(Number(a))}` : base;
+        },
+      )
       // 14:30, 18:00, 14h30, 9h
-      .replace(/\b(\d{1,2})(?::(\d{2})|h(\d{2})?)(?![\d%])/g, (todo, h: string, m1?: string, m2?: string) => {
-        const nh = Number(h);
-        const nm = Number(m1 ?? m2 ?? 0);
-        if (nh > 23 || nm > 59) return todo;
-        return hora(nh, nm);
-      })
+      .replace(
+        /\b(\d{1,2})(?::(\d{2})|h(\d{2})?)(?![\d%])/g,
+        (todo, h: string, m1?: string, m2?: string) => {
+          const nh = Number(h);
+          const nm = Number(m1 ?? m2 ?? 0);
+          if (nh > 23 || nm > 59) return todo;
+          return hora(nh, nm);
+        },
+      )
       // 10% / 2,5%
       .replace(/\b(\d+)(?:,(\d+))?\s?%/g, (_m, int: string, dec?: string) =>
         dec
