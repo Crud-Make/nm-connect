@@ -15522,6 +15522,17 @@ export const DICIONARIO: Traducoes = {
   "Setores agrupam quem atende cada área. Quando o roteador de IA leva a conversa para um setor, só os membros dele a recebem; se ninguém do setor estiver de plantão, ela espera na fila.": { es: "Los sectores agrupan a quienes atienden cada área. Cuando el enrutador de IA lleva la conversación a un sector, solo sus miembros la reciben; si nadie del sector está de guardia, espera en la cola." },
   "Todos os setores": { es: "Todos los sectores" },
   "Um dos membros não faz parte desta organização.": { es: "Uno de los miembros no forma parte de esta organización." },
+  // Resposta em nota de voz (migration 0677).
+  "Resposta em nota de voz": { es: "Respuesta en nota de voz" },
+  "Responder áudio com áudio": { es: "Responder audio con audio" },
+  "Quando o cliente manda uma nota de voz, a resposta sai em nota de voz. Se ele escreve, a resposta é texto. A voz só fala o que já passou por todas as travas de envio; se ela falhar, o texto vai no lugar.": { es: "Cuando el cliente manda una nota de voz, la respuesta sale en nota de voz. Si escribe, la respuesta es texto. La voz solo dice lo que ya pasó por todos los controles de envío; si falla, se envía el texto en su lugar." },
+  "Tom da voz (opcional)": { es: "Tono de la voz (opcional)" },
+  "Ex.: fale com calma, em tom acolhedor, com sotaque paulista.": { es: "Ej.: habla con calma, en tono cercano, con acento rioplatense." },
+  "Usa a chave da OpenAI cadastrada em Provedores de IA (ou a da instalação) e conta no limite de gasto com IA.": { es: "Usa la clave de OpenAI registrada en Proveedores de IA (o la de la instalación) y cuenta en el límite de gasto con IA." },
+  "Responder em nota de voz": { es: "Responder en nota de voz" },
+  "Quando o cliente manda áudio e o agente está configurado para isso, transforma a resposta já aprovada em nota de voz.": { es: "Cuando el cliente manda audio y el agente está configurado para eso, convierte la respuesta ya aprobada en nota de voz." },
+  "A voz é sempre a da OpenAI (gpt-4o-mini-tts), porque é o modelo que entrega o áudio no formato que o WhatsApp mostra como nota de voz e aceita instrução de tom. A chave é a OpenAI desta organização, ou a da instalação. A voz e o tom se escolhem na tela do agente.": { es: "La voz es siempre la de OpenAI (gpt-4o-mini-tts), porque es el modelo que entrega el audio en el formato que WhatsApp muestra como nota de voz y acepta instrucciones de tono. La clave es la de OpenAI de esta organización, o la de la instalación. La voz y el tono se eligen en la pantalla del agente." },
+  "O cliente manda áudio e recebe a resposta por escrito, mesmo com a resposta em nota de voz ligada no agente.": { es: "El cliente manda audio y recibe la respuesta por escrito, aunque la respuesta en nota de voz esté activada en el agente." },
 };
 
 /**
