@@ -1,6 +1,7 @@
 /**
  * As guardas COMPARTILHADAS por toda ação que manda mensagem para um contato:
- * existe, não está bloqueado, tem telefone, tem consentimento.
+ * existe, não está bloqueado, tem endereço (telefone, ou o BSUID de quem chegou
+ * pelo WhatsApp oficial com username — migration 0678), tem consentimento.
  *
  * Nasceu porque a mesma sequência de 3 `if`s vivia em `send-whatsapp.ts` e em
  * `send-ai-message.ts` — irmãs de propósito (mesmo comentário de cabeçalho:
@@ -59,13 +60,17 @@ export type MotivoDeBloqueio = "no_contact" | "contact_blocked" | "no_phone" | "
 
 export interface ContatoLiberadoParaEnvio {
   id: string;
-  phone_number: string;
+  /** `null` só quando o endereço é o BSUID. */
+  phone_number: string | null;
+  wa_bsuid?: string | null;
 }
 
 interface ContatoDoContexto {
   id: string;
   is_blocked?: boolean;
   phone_number?: string | null;
+  /** `contacts.wa_bsuid` (0678). O contexto lê `contacts.*`, então ele vem junto. */
+  wa_bsuid?: string | null;
   consent?: { marketing?: { granted_at?: string | null; declined_at?: string | null } | null } | null;
 }
 
@@ -82,8 +87,15 @@ export function checarGuardasDeContato(ctx: ActionCtx): ResultadoDaGuarda {
   const contact = ctx.context.contact as ContatoDoContexto | undefined;
   if (!contact) return { ok: false, reason: "no_contact" };
   if (contact.is_blocked) return { ok: false, reason: "contact_blocked" };
-  if (!contact.phone_number) return { ok: false, reason: "no_phone" };
+  // Sem telefone, o BSUID também é endereço: quem decide se o canal da regra
+  // sabe usá-lo é o adapter, no sink (`missing_phone_number` quando não sabe).
+  // O motivo segue `no_phone` — é o que a tela de automações já traduz.
+  const bsuid = contact.wa_bsuid?.trim() || null;
+  if (!contact.phone_number && !bsuid) return { ok: false, reason: "no_phone" };
   // Recusa registrada — não "grant ausente". Ver o cabeçalho.
   if (contact.consent?.marketing?.declined_at) return { ok: false, reason: "consent_declined" };
+  if (!contact.phone_number) {
+    return { ok: true, contact: { id: contact.id, phone_number: null, wa_bsuid: bsuid } };
+  }
   return { ok: true, contact: { id: contact.id, phone_number: contact.phone_number } };
 }

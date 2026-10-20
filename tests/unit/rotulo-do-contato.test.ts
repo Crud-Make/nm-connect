@@ -4,7 +4,13 @@ import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { ehIdentificadorTecnico, nomeDoContato, rotuloDoContato, SEM_NOME } from "@/lib/contacts/rotulo-do-contato";
+import {
+  ehIdentificadorTecnico,
+  nomeDoContato,
+  rotuloDoContato,
+  SEM_NOME,
+  SEM_TELEFONE,
+} from "@/lib/contacts/rotulo-do-contato";
 
 /**
  * COMO SE CHAMA ESTA PESSOA NA TELA.
@@ -93,6 +99,37 @@ describe("rotuloDoContato", () => {
     expect(rotuloDoContato({ display_name: "Contato 543134@lid", name: null, phone_number: null })).toBe(
       SEM_NOME,
     );
+  });
+});
+
+describe("rotuloDoContato — quem chegou pelo WhatsApp oficial com username (sem telefone)", () => {
+  const BSUID = "US.13491208655302741918";
+
+  it("o nome continua vencendo", () => {
+    expect(rotuloDoContato({ name: null, display_name: "Sheena Nelson", wa_username: "realsheenanelson", wa_bsuid: BSUID })).toBe(
+      "Sheena Nelson",
+    );
+  });
+
+  it("⭐ sem nome e sem telefone, o @username — é como a pessoa aparece no WhatsApp", () => {
+    expect(rotuloDoContato({ name: null, display_name: null, phone_number: null, wa_username: "realsheenanelson", wa_bsuid: BSUID })).toBe(
+      "@realsheenanelson",
+    );
+  });
+
+  it("o telefone, quando chega, vence o username (é o que o atendente copia)", () => {
+    expect(
+      rotuloDoContato({ name: null, display_name: null, phone_number: "+5531999990001", wa_username: "maria", wa_bsuid: BSUID }),
+    ).toBe("+5531999990001");
+  });
+
+  it("sem nome, telefone nem username, mas com BSUID: 'Cliente sem telefone' — nunca o BSUID cru", () => {
+    expect(rotuloDoContato({ name: null, display_name: null, phone_number: null, wa_bsuid: BSUID })).toBe(SEM_TELEFONE);
+    expect(SEM_TELEFONE).toBe("Cliente sem telefone");
+  });
+
+  it("sem BSUID nenhum, o literal de sempre", () => {
+    expect(rotuloDoContato({ name: null, display_name: null, phone_number: null, wa_username: null })).toBe(SEM_NOME);
   });
 });
 

@@ -19,6 +19,7 @@ ser fonte sem ninguém decidir isso.
 | `conversoes-de-anuncios.architecture.json` | venda, entrega, protocolo assíncrono, pendências e reprocessamento |
 | `prospeccao-nativa.architecture.json` | busca comercial, fila gradual, configuração conversacional persistente, sandbox e assistente de voz opcional |
 | `pre-go-live-whatsapp.architecture.json` | modo de teste por canal (issue #573): configuração administrativa, gate compartilhado, releitura no envio e validação pelo Inbox |
+| `identidade-bsuid-whatsapp-oficial.architecture.json` | quem chega pelo WhatsApp oficial com username, sem telefone (migration 0678): parser do BSUID, `fn_upsert_meta_contact` que junta a ficha quando o telefone aparece, envio por `recipient`, botão REQUEST_CONTACT_INFO, aviso da mensagem sem remetente e o rótulo na Inbox |
 | `app-da-meta-da-instalacao.architecture.json` | App da Meta da instalação (issue #850, migration 0257) — 10 peças, 12 arestas; a tela `/admin/meta` que grava a chave e mostra o token uma vez, o resolvedor que serve o par inteiro de UMA fonte (banco, com o `.env` de reserva) e por que Conexões só mostra o token quando ele veio do `.env` |
 | `agenda-google-sync.architecture.json` | fontes/destino por dono, tupla estável, três vias, claim/CAS e cobertura de calendário; presença e LGPD integradas |
 | `encerramento-atendimento.architecture.json` | conversa/demanda independentes, mutex no inbound, origem imutável dos jobs, memória vigente e guardas antes dos efeitos |

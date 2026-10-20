@@ -48,6 +48,7 @@ interface ConversaParaPresenca {
     phone_number: string | null;
     wa_identity: string | null;
     wa_lid: string | null;
+    wa_bsuid?: string | null;
   } | null;
   channel_sessions: (ChannelSessionRef & { status: string }) | null;
 }
@@ -70,7 +71,7 @@ export async function sinalizarDigitando(
   const { data } = await supabase
     .from("conversations")
     .select(
-      `is_group, group_chat_id, contacts:contact_id(phone_number, wa_identity, wa_lid), ` +
+      `is_group, group_chat_id, contacts:contact_id(phone_number, wa_identity, wa_lid, wa_bsuid), ` +
         `channel_sessions:channel_session_id(${CHANNEL_SESSION_REF_COLUMNS}, status)`,
     )
     .eq("id", input.conversationId)
@@ -96,6 +97,7 @@ export async function sinalizarDigitando(
     phoneNumber: conversa.contacts?.phone_number,
     waIdentity: conversa.contacts?.wa_identity,
     waLid: conversa.contacts?.wa_lid,
+    waBsuid: conversa.contacts?.wa_bsuid,
   });
   if (!recipient) return;
 

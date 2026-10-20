@@ -35,6 +35,7 @@ import { PREFIXO_TRANSITORIA } from "@/lib/waha/falha-transitoria";
 
 import type { MetaWebhookEnvelope } from "./envelope";
 import { ingestMetaAppContactSync, ingestMetaEcho, ingestMetaInbound } from "./ingest";
+import { avisarMensagemSemIdentidade } from "./sem-identidade";
 import type { MetaWebhookSession } from "./session";
 import { carimbosDeEntrega, soSeMaisAntigo, statusUpdate } from "./status-update";
 import { parseMetaWebhook } from "./webhook";
@@ -134,6 +135,16 @@ export async function processarWebhookMeta(
       ) {
         pendencias.push(`inbound ${e.externalId}: efeitos ${r.efeitos}`);
       }
+      continue;
+    }
+
+    if (e.kind === "inbound_sem_identidade") {
+      // Sem telefone E sem BSUID: não há contato a criar, mas a mensagem
+      // existiu — log + aviso na Central, nunca o `continue` mudo de antes.
+      // Fora de `pendencias` de propósito: o replay do mesmo corpo daria o
+      // mesmo vazio. Ver `./sem-identidade.ts`.
+      await avisarMensagemSemIdentidade(admin, session.organizationId, e, requestId);
+      desfechos.push("sem_identidade");
       continue;
     }
 

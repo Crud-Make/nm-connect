@@ -10,6 +10,13 @@ export interface Contact {
   email: string | null;
   email_normalized: string | null;
   phone_number: string | null;
+  /**
+   * Username e BSUID do WhatsApp oficial (migration 0678) — de quem chegou sem
+   * telefone. Colunas GERADAS de `source_metadata`; o BSUID nunca vai para a
+   * tela, só decide o rótulo (`rotuloDoContato`). Opcionais: respostas de antes.
+   */
+  wa_username?: string | null;
+  wa_bsuid?: string | null;
   cpf_hash: string | null;
   birthdate: string | null;
   is_blocked: boolean;

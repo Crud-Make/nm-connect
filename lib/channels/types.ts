@@ -80,6 +80,14 @@ export interface RecipientInput {
    * `waIdentity.startsWith("lid:")` — justo o caso que a regra protege.
    */
   waLid?: string | null | undefined;
+  /**
+   * `contacts.wa_bsuid` (0678) — o id do usuário no escopo da empresa, que o
+   * WhatsApp oficial usa quando a pessoa adotou username e o telefone não vem.
+   * Só o canal que sabe endereçar por ele o lê (`adapters/meta-cloud.ts`), e
+   * só quando não há telefone. Opcional: quem não o carrega se comporta como
+   * antes.
+   */
+  waBsuid?: string | null | undefined;
 }
 
 /** Contato compartilhado (vcard) — só `kind: "contact"`. */
@@ -213,6 +221,16 @@ export interface ChannelAdapter {
   isConfigured(): boolean;
   /** externalId null = canal não configurado (noop) ou resposta sem id reconhecível. */
   send(envelope: OutboundEnvelope): Promise<{ externalId: string | null }>;
+  /**
+   * Pede ao contato que compartilhe o PRÓPRIO telefone por um botão nativo do
+   * canal. OPCIONAL: só o WhatsApp oficial tem (REQUEST_CONTACT_INFO,
+   * `meta/pedir-telefone.ts`). Quem chama testa a presença do método, nunca
+   * pergunta QUAL provider é. O telefone volta pelo webhook e a ingestão o
+   * junta à ficha.
+   */
+  requestContactInfo?(
+    input: ChannelTenantScope & { sessionRef: string; recipient: string; body: string },
+  ): Promise<{ externalId: string | null }>;
   /**
    * Códigos que o chamador grava em `metadata`/`error_code`. Vivem NO ADAPTER
    * porque carregam nome de provider, e o lint da Task 7 proíbe esse nome fora

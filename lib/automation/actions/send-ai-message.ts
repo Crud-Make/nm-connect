@@ -73,7 +73,10 @@ async function execute(ctx: ActionCtx, config: Record<string, unknown>): Promise
     const acesso = await decidirPreGoLiveDoCanalViaSupabase(ctx.admin, {
       organizationId: ctx.organizationId,
       channelSessionId: sessionId,
-      contactPhoneNumber: contact.phone_number,
+      // Contato só com BSUID (username) não tem telefone para a lista de teste
+      // do canal: no modo de teste ele fica de fora, como qualquer número
+      // que não está na lista.
+      contactPhoneNumber: contact.phone_number ?? "",
     });
     if (!acesso.permite) {
       return { type: TIPO, status: "skipped", detail: { reason: acesso.motivo } };

@@ -110,7 +110,11 @@ describe("payload capenga não vira linha meia-boca", () => {
     expect(r).toEqual([]);
   });
 
-  it("mensagem sem remetente é descartada", () => {
+  it("mensagem sem remetente não vira linha — mas vira aviso, não silêncio", () => {
+    // Antes dos usernames do WhatsApp isto era só descartado. Sem telefone E sem
+    // BSUID ainda não há de quem seja a mensagem, então nada vai para
+    // `messages`; o evento `inbound_sem_identidade` é o que faz alguém ver
+    // (log + Central). Ver tests/unit/meta-bsuid-parser.test.ts.
     const r = parseMetaWebhook({
       object: "whatsapp_business_account",
       entry: [
@@ -120,7 +124,10 @@ describe("payload capenga não vira linha meia-boca", () => {
         },
       ],
     });
-    expect(r).toEqual([]);
+    expect(r.filter((e) => e.kind === "inbound_message")).toEqual([]);
+    expect(r).toEqual([
+      { kind: "inbound_sem_identidade", wabaId: "w", phoneNumberId: "", externalId: "wamid.X", type: "text" },
+    ]);
   });
 
   it("tipo que não conhecemos ainda atravessa, sem mídia inventada", () => {
