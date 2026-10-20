@@ -128,6 +128,9 @@ describe("sidebarGroups", () => {
     expect(crm?.items.map((i) => i.href)).toEqual([
       "/app/kanban",
       "/app/contacts",
+      // Módulo `processos`: só aparece onde foi instalado (caso abaixo), então a
+      // instalação fresca, que é o que o e2e de 900px mede, não ganha linha.
+      "/app/processos",
       "/app/tasks",
       // "/app/calls" (telefonia por SIP) NÃO entra aqui, e a ausência é a
       // decisão: o módulo é OPCIONAL e nasce desligado (doc 27), então a porta
@@ -168,6 +171,15 @@ describe("sidebarGroups", () => {
 });
 
 describe("hubSections", () => {
+  it("Processos só entra no sidebar do CRM onde o módulo foi instalado", () => {
+    const hrefs = (modulos: readonly ModuloOpcional[]) =>
+      sidebarGroups(true, null, undefined, modulos)
+        .find((g) => g.group.id === "crm")
+        ?.items.map((i) => i.href);
+    expect(hrefs([])).not.toContain("/app/processos");
+    expect(hrefs(["processos"])).toContain("/app/processos");
+  });
+
   it("o hub do CRM é inventário: as telas do grupo, nas duas seções", () => {
     // As seções são a régua do sidebar escrita por extenso — o que se abre todo
     // dia contra o que se define uma vez. Lista EXATA: `toContain` deixaria uma
@@ -179,6 +191,7 @@ describe("hubSections", () => {
       "/app/kanban",
       "/app/campaigns",
       "/app/contacts",
+      "/app/processos",
       "/app/companies",
       "/app/people",
       "/app/tasks",

@@ -258,6 +258,24 @@ export const NAV_CATALOG = [
     group: "crm",
     section: "O dia a dia da venda",
     sidebar: true,
+  },  {
+    // Módulo de tabela (ADR-0002, migration 0707), irmão de Honorários: a porta só existe depois
+    // que o administrador da instalação instala `processos` em `/admin/modulos`. O trabalho
+    // (lançar e aprovar andamento) acontece na ficha do contato; a lista é o índice.
+    //
+    // No CRM e NO SIDEBAR, ao lado de Contatos: para o escritório que instala o módulo, o
+    // processo é a pergunta do dia ("como está o meu processo?"), e escondido no hub de Análise
+    // ninguém o achava. A regra de altura do menu (`navegacao.spec.ts`, 900px sem rolagem) mede a
+    // instalação fresca, onde o módulo não existe — só quem o instalou paga a linha.
+    href: "/app/processos",
+    label: "Processos",
+    description: "Os processos de cada cliente, com a fase e o número CNJ.",
+    icon: "ScalesSimple",
+    group: "crm",
+    section: "O dia a dia da venda",
+    sidebar: true,
+    minRole: "viewer",
+    modulo: "processos",
   },
   {
     href: "/app/companies",
@@ -805,20 +823,7 @@ export const NAV_CATALOG = [
     minRole: "viewer",
     modulo: "honorarios",
   },
-  {
-    // Módulo de tabela (ADR-0002, migration 0707), irmão de Honorários: a porta só existe depois
-    // que o administrador da instalação instala `processos` em `/admin/modulos`. Seção de
-    // consulta, e não "Dinheiro": a lista é o índice; o trabalho (lançar e aprovar andamento)
-    // acontece na ficha do contato, onde a pessoa está.
-    href: "/app/processos",
-    label: "Processos",
-    description: "Os processos de cada cliente, com a fase e o número CNJ.",
-    icon: "ScalesSimple",
-    group: "analise",
-    section: "O histórico que se consulta",
-    minRole: "viewer",
-    modulo: "processos",
-  },
+
   {
     href: "/app/metrics",
     label: "Desempenho",
