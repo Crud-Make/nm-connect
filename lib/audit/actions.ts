@@ -1132,6 +1132,13 @@ export const AUDIT_ACTIONS = [
   "setor.created",
   "setor.updated",
   "setor.deleted",
+  // Módulo opcional de processos (advocacia, migration 0707). O andamento é o texto que vai
+  // PARA O CLIENTE, e "quem aprovou o que ele ouviu" precisa de resposta. Metadata só com ids:
+  // apelido, número CNJ e texto são dado da pessoa e a anonimização os apaga das tabelas.
+  "processo.criado",
+  "andamento.criado",
+  "andamento.editado",
+  "andamento.aprovado",
 ] as const;
 
 /** Um código de auditoria. Derivado de `AUDIT_ACTIONS` — não redigite a lista. */
