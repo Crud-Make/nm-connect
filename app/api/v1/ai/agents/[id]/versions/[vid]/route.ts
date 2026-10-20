@@ -19,7 +19,7 @@ import { traduzir } from "@/lib/i18n/dicionario";
 export const dynamic = "force-dynamic";
 
 const VERSION_COLUMNS =
-  "id, organization_id, agent_id, version_number, system_prompt, provider, model, credential_id, tool_ids, trigger_config, channel_session_id, max_steps, token_budget, cost_budget_cents, history_message_window, history_token_window, handoff_keywords, handoff_tool_enabled, handoff_legal_enabled, proposal_ai_draft_enabled, cases_enabled, split_messages, split_max_chars, followup, operator_enabled, operator_model, operator_tool_ids, status, published_at, superseded_at, created_at, created_by,pipeline_ids,knowledge_source_ids,provisioning_origin,inbound_debounce_ms";
+  "id, organization_id, agent_id, version_number, system_prompt, provider, model, credential_id, tool_ids, trigger_config, channel_session_id, max_steps, token_budget, cost_budget_cents, history_message_window, history_token_window, handoff_keywords, handoff_tool_enabled, handoff_legal_enabled, voice_reply_enabled, voice_reply_voice, voice_reply_instructions, proposal_ai_draft_enabled, cases_enabled, split_messages, split_max_chars, followup, operator_enabled, operator_model, operator_tool_ids, status, published_at, superseded_at, created_at, created_by,pipeline_ids,knowledge_source_ids,provisioning_origin,inbound_debounce_ms";
 
 const UUID_RX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -147,6 +147,10 @@ export async function PATCH(req: NextRequest, ctx: Ctx): Promise<Response> {
     update.handoff_tool_enabled = patch.handoff_tool_enabled;
   if (patch.handoff_legal_enabled !== undefined)
     update.handoff_legal_enabled = patch.handoff_legal_enabled;
+  if (patch.voice_reply_enabled !== undefined) update.voice_reply_enabled = patch.voice_reply_enabled;
+  if (patch.voice_reply_voice !== undefined) update.voice_reply_voice = patch.voice_reply_voice;
+  if (patch.voice_reply_instructions !== undefined)
+    update.voice_reply_instructions = patch.voice_reply_instructions;
   if (patch.proposal_ai_draft_enabled !== undefined)
     update.proposal_ai_draft_enabled = patch.proposal_ai_draft_enabled;
   if (patch.cases_enabled !== undefined) update.cases_enabled = patch.cases_enabled;
