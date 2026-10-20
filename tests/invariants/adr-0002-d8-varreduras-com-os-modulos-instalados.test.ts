@@ -169,6 +169,22 @@ const PROVA_DE_MODULO: Record<string, { readonly arquivo: string; readonly razao
       "imutabilidade da parcela paga (status e financial_entry_id não mudam sem o caixa) e a " +
       "recusa de FK cross-org. A leitura cross-org por contagem é medida neste arquivo.",
   },
+  // 0707 — as duas tabelas do módulo processos, que nascem em `fn_processos_provisionar()`.
+  processos: {
+    arquivo: "tests/invariants/processos-rls-por-operacao.test.ts",
+    razao:
+      "JWT real (`writeCountAs`/`countAs`): viewer lê e não escreve, agent cria e edita e não " +
+      "apaga, manager apaga (controle positivo); ninguém da organização A lê, edita, apaga ou cria " +
+      "processo da B; e a FK composta recusa o contato de OUTRA organização. A leitura cross-org " +
+      "por contagem é medida neste arquivo.",
+  },
+  andamentos: {
+    arquivo: "tests/invariants/processos-rls-por-operacao.test.ts",
+    razao:
+      "Mesmo arquivo: viewer lê só o aprovado, agent lê os dois; a sessão só cria, edita e apaga " +
+      "rascunho — nem manager reescreve, apaga ou devolve o aprovado, nem aprova à mão com o hash " +
+      "certo; a FK composta recusa processo de OUTRA organização e o vizinho não lê nada.",
+  },
   // #1907 — as cinco tabelas da comanda, que nascem em `fn_financeiro_provisionar()`
   // (ADR-0002 D2/D3). A prova comportamental é a MESMA da lista de leitura
   // org-scoped de `rls-isolation.test.ts`: linha REAL semeada por organização e
