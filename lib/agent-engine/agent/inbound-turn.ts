@@ -56,6 +56,7 @@ import { WahaChannelAdapter } from '../edge/channel/waha-adapter';
 // egress de canal — o envio em si vai pelo adapter (ChannelAdapter). Ver F2-25.
 import { applySendOutcome } from '../edge/crm/send-message';
 import {
+  aplicarOrcamento,
   LlmBudgetExceededError,
   runModelCall,
   tool,
@@ -69,6 +70,23 @@ import { abreAvisoDoEspelhoRecusado, mirrorLeadStageToCrm } from '../edge/crm/mo
 import { insertInboxItem } from '../db/repository';
 import { criarConferidorDeAfirmacoes } from '@/lib/ai/decisao/afirmacao-de-fato';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { resolveOrgLlmConfig } from '../edge/llm/credentials';
+import { chaveDeOrcamentoDaInstalacao } from '../../instalacao/comportamento';
+import { registrarChamadaDeIa } from '@/lib/ai/usage/registrar-chamada';
+import {
+  coletarApelidosDeProcesso,
+  decidirFormatoDaResposta,
+  gerarNotaDeVoz,
+  instrucaoDeVoz,
+  MOTIVOS_DO_TEXTO,
+  prepararRespostaEmAudio,
+  type ChamadaDeVoz,
+  type DecisaoDoFormato,
+  type MotivoDoTexto,
+  type Preparo,
+} from '@/lib/messaging/voz/resposta-em-audio';
+import { sintetizarFala } from '@/lib/messaging/voz/sintese-de-fala';
+import { guardarNotaDeVozNaConversa } from '@/lib/messaging/voz/guardar-nota-de-voz';
 import { moverLeadParaEtapaDeHandoff } from '@/lib/leads/handoff-stage-move';
 import { detectUrgencySignal } from '../guardrails/sinal-de-urgencia';
 import { buildNativeMediaParts } from './media-parts';
@@ -2933,6 +2951,147 @@ async function executarTurnoDoAgente(
   // turno com dois vetos ficaria mudo por mais de 20 segundos: o conserto do
   // "rápido demais" viraria o defeito simétrico, mais caro que o original.
   let jaEsperouComoHumano = false;
+  // ── RESPOSTA EM NOTA DE VOZ (migration 0704, `lib/messaging/voz/`) ─────────
+  //
+  // A decisão é por turno: o agente ligou "Responder áudio com áudio" E a
+  // mensagem que abriu ESTE turno (`inbound_message_id`) é nota de voz. Lida
+  // uma vez, e só quando o interruptor está ligado — quem não liga não paga
+  // nem a consulta.
+  let decisaoDaVoz: Promise<DecisaoDoFormato> | null = null;
+  const decidirVoz = (): Promise<DecisaoDoFormato> =>
+    (decisaoDaVoz ??= (async (): Promise<DecisaoDoFormato> => {
+      const config = agentConfig?.voiceReply ?? null;
+      const ehCandidato =
+        !preview && config?.enabled === true && job?.kind === 'inbound_turn' && input.inboundMessageId !== undefined;
+      let tipo: string | null = null;
+      if (ehCandidato) {
+        try {
+          const { rows } = await pool.query<{ type: string }>(
+            'select type from messages where organization_id = $1 and id = $2',
+            [tenantId, input.inboundMessageId],
+          );
+          tipo = rows[0]?.type ?? null;
+        } catch (err) {
+          // Sem saber o tipo, a resposta é texto — o comportamento de sempre.
+          runLog.warn('resposta em áudio: não li o tipo da mensagem do turno — segue texto', {
+            error: (err instanceof Error ? err.message : String(err)).slice(0, 120),
+          });
+        }
+      }
+      return decidirFormatoDaResposta({
+        config,
+        tipoDaMensagemQueDisparou: tipo,
+        jobKind: job?.kind ?? null,
+        preview: preview !== undefined,
+      });
+    })());
+  // O PREPARO (chave OpenAI + teto de gasto) roda FORA do lock do número, antes
+  // da cadeia `before_send`, uma vez por turno. Ver `prepararRespostaEmAudio`.
+  let preparoDaVoz: Promise<Preparo> | null = null;
+  const prepararVoz = (): Promise<Preparo> =>
+    (preparoDaVoz ??= (async (): Promise<Preparo> => {
+      const decisao = await decidirVoz();
+      let cfgDaVoz: Awaited<ReturnType<typeof resolveOrgLlmConfig>> | null = null;
+      return prepararRespostaEmAudio({
+        decisao,
+        // A escada de sempre para a OpenAI (a mesma do worker de transcrição):
+        // credencial ativa e validada da organização, senão `OPENAI_API_KEY`.
+        chaveOpenai: async () => {
+          try {
+            cfgDaVoz = await resolveOrgLlmConfig(pool, deps.llmCfg, tenantId, { provider: 'openai' });
+            return { apiKey: cfgDaVoz.apiKey, origemDaChave: cfgDaVoz.origemDaChave };
+          } catch {
+            return null;
+          }
+        },
+        // O gate do seam, não uma cópia: mesmo veredito, mesmo aviso
+        // `budget_exceeded` na Central, mesma linha `orcamento_esgotado`.
+        checarOrcamento: async (origemDaChave) => {
+          if (cfgDaVoz === null) return 'seguir';
+          try {
+            await aplicarOrcamento({
+              db: pool,
+              organizationId: tenantId,
+              orcamentoDaConfig: cfgDaVoz.orcamento,
+              orcamentoIndisponivelPorque: cfgDaVoz.orcamentoIndisponivelPorque,
+              chave: chaveDeOrcamentoDaInstalacao(deps.llmCfg.budgetEnforcement ?? 'on'),
+              origemDaChave,
+              // Literal, e não a constante: a varredura de `pontos-de-ia-completude`
+              // lê o `purpose` do texto. `PONTO_RESPOSTA_EM_AUDIO` é o mesmo id.
+              purpose: 'resposta_em_audio',
+              provider: 'openai',
+              model: 'gpt-4o-mini-tts',
+              origem: origemDaChave,
+              input: { tenantId, leadId: leadId || undefined, jobId: job?.id },
+              log: runLog,
+            });
+            return 'seguir';
+          } catch (err) {
+            if (err instanceof LlmBudgetExceededError) return 'barrado';
+            throw err;
+          }
+        },
+      });
+    })());
+  // Apelidos de processo vistos neste turno (resultado da consulta ao banco
+  // externo): o número CNJ vira o apelido na fala, nunca dígito a dígito.
+  const apelidosDeProcesso = new Map<string, string>();
+  // O que o ÚLTIMO `send` decidiu sobre a voz, e as linhas de custo a gravar.
+  // Gravados DEPOIS da cadeia, fora do lock (ver `gravarVozDoEnvio`).
+  let vozDoEnvio: { formato: 'audio' | 'texto'; motivo: MotivoDoTexto | null } | null = null;
+  const chamadasDeVoz: ChamadaDeVoz[] = [];
+  const gravarVozDoEnvio = async (messageId: string | null): Promise<void> => {
+    const pendentes = chamadasDeVoz.splice(0);
+    for (const c of pendentes) {
+      await registrarChamadaDeIa(createAdminClient(), {
+        organization_id: tenantId,
+        agent_id: agentConfig?.agentId ?? null,
+        contact_id: leadId || null,
+        purpose: 'resposta_em_audio',
+        provider: 'openai',
+        model: c.model,
+        input_tokens: c.inputTokens,
+        output_tokens: c.outputTokens,
+        cost_cents: c.costCents,
+        latency_ms: c.latencyMs,
+        erro: c.ok ? null : { message: c.erro ?? 'falha na síntese de voz', ...(c.status !== undefined ? { status: c.status } : {}) },
+      });
+    }
+    const voz = vozDoEnvio;
+    vozDoEnvio = null;
+    if (voz === null) return;
+    if (voz.motivo !== null) {
+      // Falha nunca é silêncio: o texto aprovado saiu como texto, e o motivo fica.
+      runLog.warn('resposta em áudio: o texto saiu como texto', {
+        motivo: voz.motivo,
+        motivo_legivel: MOTIVOS_DO_TEXTO[voz.motivo],
+      });
+    } else {
+      runLog.info('resposta em áudio: nota de voz enviada', { message_id: messageId });
+    }
+    if (messageId === null) return;
+    try {
+      await pool.query(
+        `update messages
+            set metadata = coalesce(metadata, '{}'::jsonb)
+              || jsonb_build_object('resposta_em_audio', $3::jsonb)
+          where organization_id = $1 and id = $2`,
+        [
+          tenantId,
+          messageId,
+          JSON.stringify(
+            voz.motivo === null
+              ? { formato: 'audio' }
+              : { formato: 'texto', motivo: voz.motivo, motivo_legivel: MOTIVOS_DO_TEXTO[voz.motivo] },
+          ),
+        ],
+      );
+    } catch (err) {
+      runLog.warn('resposta em áudio: motivo não anexado à mensagem', {
+        error: (err instanceof Error ? err.message : String(err)).slice(0, 120),
+      });
+    }
+  };
   // Knobs de atraso humano por conexão (0499) — lidos UMA vez por turno para a
   // pausa antes da 1ª bolha (`esperarComoHumano`) e para o jitter entre bolhas
   // (`throttle_ms + jitter_max_ms`). Sem linha em channel_knobs caem nos defaults
@@ -3397,6 +3556,19 @@ async function executarTurnoDoAgente(
           fotosDoProduto = preparadas.fotos;
           fotosQueFaltaram = preparadas.tinha - preparadas.fotos.length;
         }
+        // Resposta em nota de voz: chave e teto resolvidos AQUI, fora do lock do
+        // número e antes da cadeia. Foto do produto vai como imagem com legenda —
+        // a voz não entra nesse envio.
+        const preparoDaVozNoEnvio: Preparo =
+          preview || fotosDoProduto.length > 0
+            ? { pronta: null, motivo: null }
+            : await prepararVoz().catch((err: unknown): Preparo => {
+                // O preparo nunca derruba o envio: sem ele, a resposta sai em texto.
+                runLog.warn('resposta em áudio: preparo falhou — segue texto', {
+                  error: (err instanceof Error ? err.message : String(err)).slice(0, 120),
+                });
+                return { pronta: null, motivo: 'preparo_falhou' };
+              });
         // F4-04: sinaliza (independente do gate F4-01/F4-08) se ESTA candidata é uma
         // promessa fora de tabela — usado só para correlacionar com o jailbreak no fim do
         // turno. A detecção é determinística (decidePromise); sem tabela do tenant = no-op.
@@ -3576,25 +3748,63 @@ async function executarTurnoDoAgente(
               // do turno (a checagem de `max_sends_per_turn` acima roda uma vez, antes).
               // O resto é medido ANTES DE CADA FOTO, depois do texto: o texto acima do
               // teto de legenda sai à parte e também gasta o teto.
-              return enviarComFotos(finalBody, fotosDoProduto, {
-                sleep,
-                jitter,
-                restantes: () => maxSendsPerTurn - seq,
-                enviarFoto: (foto, legenda) => enviar(legenda, foto),
-                enviarTexto: (texto) =>
-                  sendInBubbles(texto, {
-                    enabled: agentConfig?.splitMessages ?? false,
-                    maxChars: agentConfig?.splitMaxChars ?? 600,
-                    // O teto do turno vale para as bolhas: o que passa dele vai junto na última.
-                    maxBubbles: Math.max(1, maxSendsPerTurn - seq),
-                    sleep,
-                    jitter,
-                    // A pausa humana do turno NÃO mora mais aqui: ela subiu para
-                    // `esperaForaDoLock` (paga antes de o guardrail tomar o lock do número) —
-                    // issue #654. Neste ponto fica só o jitter anti-ban entre bolhas.
-                    send: (bubble) => enviar(bubble),
-                  }),
-              });
+              const enviarComoTexto = (): Promise<ChannelSendResult> => {
+                return enviarComFotos(finalBody, fotosDoProduto, {
+                  sleep,
+                  jitter,
+                  restantes: () => maxSendsPerTurn - seq,
+                  enviarFoto: (foto, legenda) => enviar(legenda, foto),
+                  enviarTexto: (texto) =>
+                    sendInBubbles(texto, {
+                      enabled: agentConfig?.splitMessages ?? false,
+                      maxChars: agentConfig?.splitMaxChars ?? 600,
+                      // O teto do turno vale para as bolhas: o que passa dele vai junto na última.
+                      maxBubbles: Math.max(1, maxSendsPerTurn - seq),
+                      sleep,
+                      jitter,
+                      // A pausa humana do turno NÃO mora mais aqui: ela subiu para
+                      // `esperaForaDoLock` (paga antes de o guardrail tomar o lock do número) —
+                      // issue #654. Neste ponto fica só o jitter anti-ban entre bolhas.
+                      send: (bubble) => enviar(bubble),
+                    }),
+                });
+              };
+              // ── A VOZ SÓ FALA O QUE A CADEIA APROVOU ──────────────────────
+              // `finalBody` é o corpo que passou por TODOS os gates (e pela
+              // emenda do disclosure, quando houver). Ele vira UMA nota de voz,
+              // sem bolhas; o texto vai no `body` da mensagem para a Inbox. Toda
+              // falha antes do canal manda o MESMO texto como texto.
+              const falarOuEscrever = async (): Promise<ChannelSendResult> => {
+                const pronta = preparoDaVozNoEnvio.pronta;
+                if (pronta === null) {
+                  if (preparoDaVozNoEnvio.motivo !== null) {
+                    vozDoEnvio = { formato: 'texto', motivo: preparoDaVozNoEnvio.motivo };
+                  }
+                  return enviarComoTexto();
+                }
+                const nota = await gerarNotaDeVoz({
+                  texto: finalBody,
+                  apelidos: apelidosDeProcesso,
+                  pronta,
+                  sintetizar: (e) => sintetizarFala(e),
+                  guardar: guardarNotaDeVozNaConversa(tenantId, input.conversationId),
+                });
+                if (nota.chamada !== null) chamadasDeVoz.push(nota.chamada);
+                if (!nota.ok) {
+                  vozDoEnvio = { formato: 'texto', motivo: nota.motivo };
+                  return enviarComoTexto();
+                }
+                const doAudio = await enviar(finalBody, { storagePath: nota.storagePath, mime: nota.mime });
+                if (doAudio.kind === 'failed' && maxSendsPerTurn - seq > 0) {
+                  // O canal registrou a nota como falha: o texto vai no lugar, na
+                  // hora, em vez de deixar o cliente sem resposta até o retry.
+                  vozDoEnvio = { formato: 'texto', motivo: 'envio_do_audio_falhou' };
+                  return enviarComoTexto();
+                }
+                vozDoEnvio = { formato: 'audio', motivo: null };
+                return doAudio;
+              };
+              return falarOuEscrever();
             },
           };
           let chain = await runBeforeSend(beforeSendArgs);
@@ -3739,6 +3949,9 @@ async function executarTurnoDoAgente(
             return { ok: false, error: { code: chain.code, message: chain.message } };
           }
           const outcome = chain.outcome;
+          await gravarVozDoEnvio(
+            outcome.kind === 'sent' || outcome.kind === 'already_sent' ? outcome.messageId : null,
+          );
           outcomes.push(outcome);
           if (outcome.kind === 'sent' && pendingCitations.length > 0) {
             try {
@@ -3815,6 +4028,8 @@ async function executarTurnoDoAgente(
               };
           }
         } catch (err) {
+          // O custo de uma voz já gerada entra no teto mesmo quando o envio quebrou.
+          await gravarVozDoEnvio(null);
           // bug de programação no adapter: ensina o modelo a encerrar E derruba o job.
           noteRunError(err instanceof Error ? err : new Error(String(err)));
           return {
@@ -4313,6 +4528,18 @@ async function executarTurnoDoAgente(
                   return executeOriginal(...args);
                 }) as typeof mcpTool.execute,
               };
+            } else if (name === 'crm_query_external_data' && typeof mcpTool.execute === 'function') {
+              // Resposta em nota de voz: o par número CNJ → apelido que a consulta
+              // devolveu é o que a fala usa no lugar do número (`texto-para-fala.ts`).
+              const executeOriginal = mcpTool.execute.bind(mcpTool);
+              rawTools[name] = {
+                ...mcpTool,
+                execute: (async (...args: Parameters<typeof executeOriginal>) => {
+                  const resultado = await executeOriginal(...args);
+                  coletarApelidosDeProcesso(resultado, apelidosDeProcesso);
+                  return resultado;
+                }) as typeof mcpTool.execute,
+              };
             } else {
               rawTools[name] = mcpTool;
             }
@@ -4577,7 +4804,10 @@ async function executarTurnoDoAgente(
     // Sufixos por-lead (situacionais, voláteis — depois do prefixo cacheável F2-17): corpos de
     // skill casadas (F3-09) + hint do classificador (F3-11) + instrução de split (F4-xx, quando
     // split_messages está on — Onda 4). Vazios são omitidos.
-    const splitHint = instrucaoDeBolhas(agentConfig?.splitMessages ?? false);
+    // Resposta em nota de voz: a voz é uma nota só, então o pedido de bolhas
+    // dá lugar ao pedido de escrever como se fala.
+    const vozHint = instrucaoDeVoz(await decidirVoz());
+    const splitHint = vozHint !== '' ? vozHint : instrucaoDeBolhas(agentConfig?.splitMessages ?? false);
     // Spec 15: o `case_id` real do caso 'awaiting_lead' desta conversa, se houver — sem
     // isso o modelo nunca consegue chamar provide_case_update quando o lead simplesmente
     // responde (o caminho comum; case_reply_turn só cobre a AÇÃO do humano). Sufixo

@@ -213,6 +213,23 @@ export const PONTOS_DE_IA: readonly PontoDeIa[] = [
     registraEm: "llm_calls",
   },
   {
+    id: "resposta_em_audio",
+    rotulo: "Responder em nota de voz",
+    oQueFaz:
+      "Quando o cliente manda áudio e o agente está configurado para isso, transforma a resposta já aprovada em nota de voz.",
+    papel: "atender",
+    exige: {},
+    emissor: "lib/agent-engine/agent/inbound-turn.ts",
+    fixo: {
+      razao:
+        "A voz é sempre a da OpenAI (gpt-4o-mini-tts), porque é o modelo que entrega o áudio no formato que o WhatsApp mostra como nota de voz e aceita instrução de tom. A chave é a OpenAI desta organização, ou a da instalação. A voz e o tom se escolhem na tela do agente.",
+      usa: { provider: "openai", modelId: "gpt-4o-mini-tts" },
+    },
+    sintomaDeFalha:
+      "O cliente manda áudio e recebe a resposta por escrito, mesmo com a resposta em nota de voz ligada no agente.",
+    registraEm: "llm_calls",
+  },
+  {
     id: "operator_turn",
     rotulo: "Trabalhar o funil",
     oQueFaz:
