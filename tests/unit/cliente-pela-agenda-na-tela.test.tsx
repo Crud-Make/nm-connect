@@ -28,7 +28,10 @@ vi.mock("@/hooks/auth/AuthProvider", () => ({
   useAuth: () => ({ user: USER, activeOrg: { ...ORG, cliente_pela_agenda: ligada } }),
 }));
 vi.mock("@/hooks/i18n/useT", () => ({ useT: () => (s: string) => s }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("@/hooks/contacts/useContact", () => ({
   useContact: () => ({ isLoading: false, isError: false, data: { data: CONTATO }, refetch: vi.fn() }),
 }));
