@@ -118,6 +118,17 @@ function ehCanalOficial(c: ChannelSession): boolean {
   return fonteDeTemplates(c.provider) === "oficial";
 }
 
+/**
+ * "Esta instalação só fala pelo canal oficial?" — decide o aviso de serviço do
+ * WhatsApp ausente. O canal oficial não passa pelo transporte, então avisar
+ * que falta o serviço a quem só tem número oficial é alarme sobre algo que
+ * ela não usa. Lista vazia não conta: quem ainda não conectou nada pode ir
+ * pelo QR, e o aviso é o que explica por que ali não vai funcionar.
+ */
+function soCanalOficial(list: ChannelSession[]): boolean {
+  return list.length > 0 && list.every(ehCanalOficial);
+}
+
 /** "3 conversas" / "1 conversa" — ou nada, quando não há o que contar. */
 function contar(
   n: number,
@@ -497,7 +508,7 @@ export function ConnectionsClient({ wahaConfigured }: { wahaConfigured: boolean 
         else toast.error(t("Não foi possível copiar. Selecione e copie manualmente."));
       }}>{t("Copiar detalhes")}</Button></details>}
       <Link href="/app/settings/atendimento" className="text-sm underline">{t("Configurar responsáveis por número")}</Link>
-      {!wahaConfigured && (
+      {!wahaConfigured && !soCanalOficial(list) && (
         <div className="rounded-md border border-warning bg-warning-bg p-4 text-sm text-warning-fg">
           <p className="font-medium">{t("O serviço do WhatsApp não está configurado.")}</p>
           <p className="mt-1">
