@@ -13,10 +13,9 @@ import { ok } from "@/lib/api/wrappers";
 import { audit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/require-role";
 import { requireSupportWrite } from "@/lib/impersonate/support";
-import { andamentoTextoSchema } from "@/lib/schemas/processos";
 import { createClient } from "@/lib/supabase/server";
 
-import { corpoInvalido, respostaDaFalha } from "../../_falha";
+import { abrirEscritaDeAndamento, respostaDaFalha } from "../../_falha";
 
 export const dynamic = "force-dynamic";
 
@@ -45,25 +44,22 @@ export async function GET(_req: NextRequest, ctx: Ctx): Promise<Response> {
 }
 
 export async function POST(req: NextRequest, ctx: Ctx): Promise<Response> {
-  const requestId = randomUUID();
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
 
-  const authz = await requireRole("agent", { requestId, resource: "andamentos" });
-  if (!authz.ok) return authz.response;
-  const { id: processoId } = await ctx.params;
-
-  const lido = andamentoTextoSchema.safeParse(await req.json().catch(() => ({})));
-  if (!lido.success) return corpoInvalido(lido.error.issues, requestId);
+  const escrita = await abrirEscritaDeAndamento(req, ctx);
+  if (!escrita.ok) return escrita.resposta;
+  const { requestId } = escrita;
+  const { id: processoId, texto } = escrita.dados;
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("andamentos")
     .insert({
-      organization_id: authz.org.orgId,
+      organization_id: escrita.orgId,
       processo_id: processoId,
-      texto: lido.data.texto,
-      criado_por: authz.user.id,
+      texto,
+      criado_por: escrita.userId,
     })
     .select(COLUNAS)
     .single();

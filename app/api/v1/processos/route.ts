@@ -20,7 +20,7 @@ import { requireSupportWrite } from "@/lib/impersonate/support";
 import { listarProcessosQuerySchema, processoCreateSchema } from "@/lib/schemas/processos";
 import { createClient } from "@/lib/supabase/server";
 
-import { corpoInvalido, respostaDaFalha } from "./_falha";
+import { abrirEscrita, corpoInvalido, respostaDaFalha } from "./_falha";
 
 export const dynamic = "force-dynamic";
 
@@ -54,20 +54,20 @@ export async function GET(req: NextRequest): Promise<Response> {
 }
 
 export async function POST(req: NextRequest): Promise<Response> {
-  const requestId = randomUUID();
   const supportDenied = await requireSupportWrite();
   if (supportDenied) return supportDenied;
 
-  const authz = await requireRole("agent", { requestId, resource: "processos" });
-  if (!authz.ok) return authz.response;
-
-  const lido = processoCreateSchema.safeParse(await req.json().catch(() => ({})));
-  if (!lido.success) return corpoInvalido(lido.error.issues, requestId);
+  const escrita = await abrirEscrita(req, processoCreateSchema, {
+    papel: "agent",
+    recurso: "processos",
+  });
+  if (!escrita.ok) return escrita.resposta;
+  const { requestId } = escrita;
 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("processos")
-    .insert({ organization_id: authz.org.orgId, ...lido.data })
+    .insert({ organization_id: escrita.orgId, ...escrita.dados })
     .select(COLUNAS)
     .single();
   if (error) return respostaDaFalha(error, requestId, CONTATO_INVALIDO);
