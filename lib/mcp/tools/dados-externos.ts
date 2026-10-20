@@ -24,7 +24,6 @@
 import { z } from "zod";
 
 import { abrirAcesso } from "@/lib/external-db/acesso";
-import { lerConferencia, situacaoDaConferencia } from "@/lib/external-db/conferencia-de-cpf";
 import { colunasDaTabela, listarTabelas } from "@/lib/external-db/introspeccao";
 import { LeituraInvalidaError, lerTabela } from "@/lib/external-db/leitura";
 import { LIMITE_FILTROS, LIMITE_LINHAS } from "@/lib/external-db/limites";
@@ -37,6 +36,8 @@ import type {
 import type { TipoDeIdentificador } from "@/lib/external-db/schemas";
 
 import type { McpContext, McpToolDefinition } from "../types";
+
+import { crmConfirmCustomerIdentity, recusaPelaTravaDoCpf } from "./conferencia-de-identidade";
 
 /** O que o modelo recebe junto com qualquer dado vindo de fora. */
 const AVISO_DADOS_NAO_CONFIAVEIS =
@@ -199,49 +200,6 @@ function mensagemDeAcesso(motivo: string): string {
   }
 }
 
-/**
- * A TRAVA DO CPF na consulta (issue #18). Conexão com `require_cpf_check`, no
- * turno de uma conversa: sem conferência válida do contato do turno, a consulta
- * NÃO sai — volta um erro em texto que ensina o modelo a pedir os dígitos e a
- * usar `crm_confirm_customer_identity`, sem dado nenhum. Ler o estado falhou =
- * recusa (falha fechado). Fora do turno, quem chama não passa por aqui.
- */
-async function recusaPelaTravaDoCpf(
-  ctx: McpContext,
-  contatoId: string,
-  conexaoId: string,
-): Promise<Record<string, unknown> | null> {
-  let estado;
-  try {
-    estado = await lerConferencia(ctx.supabase, ctx.organizationId, contatoId, conexaoId);
-  } catch {
-    return {
-      erro: "conferencia_indisponivel",
-      mensagem:
-        "não foi possível confirmar a identidade do cliente agora, então os dados não podem ser " +
-        "mostrados. Diga que a equipe confirma.",
-    };
-  }
-  const situacao = situacaoDaConferencia(estado, new Date());
-  if (situacao.tipo === "verificado") return null;
-  if (situacao.tipo === "bloqueado") {
-    return {
-      erro: "identidade_bloqueada",
-      mensagem:
-        "a conferência de identidade deste cliente está bloqueada por excesso de tentativas. Não " +
-        "peça os dígitos de novo e não informe dado nenhum: diga que a equipe vai atendê-lo " +
-        "pessoalmente e passe a conversa para uma pessoa.",
-    };
-  }
-  return {
-    erro: "identidade_nao_conferida",
-    mensagem:
-      "antes de mostrar dados deste banco é preciso confirmar a identidade do cliente. Peça a ele " +
-      "os 3 últimos dígitos do CPF e chame crm_confirm_customer_identity com eles. Não consulte " +
-      "de novo antes de a conferência dar certo, e não repita os dígitos na resposta.",
-  };
-}
-
 // ---------------------------------------------------------------------------
 // crm_describe_external_data
 // ---------------------------------------------------------------------------
@@ -391,7 +349,12 @@ export const crmQueryExternalData: McpToolDefinition<typeof consultarInputShape>
 
     // ── A TRAVA DO CPF: na conversa, conferir antes de ler ────────────────
     if (ctx.contatoDoTurno && acesso.conexao.exigeConferenciaDeCpf) {
-      const recusa = await recusaPelaTravaDoCpf(ctx, ctx.contatoDoTurno, acesso.conexao.id);
+      const recusa = await recusaPelaTravaDoCpf(
+        ctx,
+        ctx.contatoDoTurno,
+        acesso.conexao.id,
+        crmConfirmCustomerIdentity.name,
+      );
       if (recusa) return recusa;
     }
 

@@ -13,6 +13,12 @@
  *
  * É ESCRITA (grava a tentativa em `verificacoes_de_identidade`, e o bloqueio
  * abre aviso na Central), mesmo lendo o banco externo — `tests/unit/tool-read-nao-muta.test.ts`.
+ *
+ * Duas peças daqui são de QUALQUER fonte da trava, e por isso são exportadas:
+ * `concluirConferencia` (a cauda depois de saber se confere — gravar, bloquear,
+ * avisar a Central, responder) e `recusaPelaTravaDoCpf` (a recusa da consulta
+ * sem conferência válida). A fonte é a conexão do banco externo, ou `null` para o
+ * CPF do cadastro do contato (migration 0706).
  */
 import { z } from "zod";
 
@@ -26,14 +32,32 @@ import {
   lerConferencia,
   situacaoDaConferencia,
   telefoneDoContato,
+  type EstadoDaConferencia,
 } from "@/lib/external-db/conferencia-de-cpf";
 import { logger } from "@/lib/logger";
 
-import type { McpToolDefinition } from "../types";
+import type { McpContext, McpToolDefinition } from "../types";
 
-const MENSAGEM_CONFERIU =
-  "identidade confirmada. Agora consulte com crm_query_external_data e responda ao cliente. " +
-  "Não repita os dígitos na resposta.";
+/** A ferramenta que lê o dado do banco externo depois da conferência. */
+const CONSULTA_DO_BANCO_EXTERNO = "crm_query_external_data";
+
+/** Onde a trava confere, e qual ferramenta o modelo usa depois de conferir. */
+export interface AlvoDaConferencia {
+  contatoId: string;
+  /** A conexão do banco externo; `null` = o CPF do cadastro do contato (0706). */
+  conexaoId: string | null;
+  /** A ferramenta que lê o dado depois de a identidade conferir. */
+  ferramentaDeConsulta: string;
+}
+
+function respostaConferiu(ferramentaDeConsulta: string) {
+  return {
+    confere: true,
+    mensagem:
+      `identidade confirmada. Agora consulte com ${ferramentaDeConsulta} e responda ao cliente. ` +
+      "Não repita os dígitos na resposta.",
+  };
+}
 
 const MENSAGEM_NAO_CONFERIU =
   "os dígitos não conferem. Peça com educação para o cliente conferir e mandar de novo os 3 " +
@@ -45,6 +69,10 @@ const MENSAGEM_BLOQUEADO =
   "informe nenhum dado do processo: diga ao cliente que a equipe do escritório vai atendê-lo " +
   "pessoalmente e passe a conversa para uma pessoa (request_human_handoff, ou " +
   "crm_request_human_handoff — a que você tiver).";
+
+function respostaBloqueado() {
+  return { confere: false, tentativas_restantes: 0, bloqueado: true, mensagem: MENSAGEM_BLOQUEADO };
+}
 
 const inputShape = {
   digitos: z
@@ -128,12 +156,8 @@ export const crmConfirmCustomerIdentity: McpToolDefinition<typeof inputShape> = 
     // Bloqueado e já conferido NÃO perguntam ao banco externo: o primeiro é o
     // que impede a força bruta (1.000 combinações), o segundo poupa a ida.
     const situacao = situacaoDaConferencia(estado, agora);
-    if (situacao.tipo === "bloqueado") {
-      return { confere: false, tentativas_restantes: 0, bloqueado: true, mensagem: MENSAGEM_BLOQUEADO };
-    }
-    if (situacao.tipo === "verificado") {
-      return { confere: true, mensagem: MENSAGEM_CONFERIU };
-    }
+    if (situacao.tipo === "bloqueado") return respostaBloqueado();
+    if (situacao.tipo === "verificado") return respostaConferiu(CONSULTA_DO_BANCO_EXTERNO);
 
     const acesso = await abrirAcesso(ctx.supabase, ctx.organizationId, conexaoId);
     if (!acesso.ok) {
@@ -161,28 +185,94 @@ export const crmConfirmCustomerIdentity: McpToolDefinition<typeof inputShape> = 
       return { erro: "falha_na_conferencia", mensagem: "não foi possível conferir agora. Diga que a equipe confirma." };
     }
 
-    const desfecho = aplicarResultado(estado, confere, agora);
-    await gravarConferencia(ctx.supabase, ctx.organizationId, contatoId, conexaoId, desfecho.novo);
-
-    if (desfecho.acabouDeBloquear) {
-      try {
-        await avisarCentralDoBloqueio(ctx.supabase, ctx.organizationId, contatoId);
-      } catch (err) {
-        // O bloqueio já está gravado — é ele que protege o dado. O aviso que
-        // falhou vira log; o modelo segue instruído a passar para uma pessoa.
-        logger.warn("[conferencia-de-cpf] aviso na Central falhou", {
-          organizationId: ctx.organizationId,
-          erro: err instanceof Error ? err.message.slice(0, 200) : "desconhecido",
-        });
-      }
-      return { confere: false, tentativas_restantes: 0, bloqueado: true, mensagem: MENSAGEM_BLOQUEADO };
-    }
-
-    if (confere) return { confere: true, mensagem: MENSAGEM_CONFERIU };
-    return {
-      confere: false,
-      tentativas_restantes: desfecho.situacao.tipo === "pendente" ? desfecho.situacao.tentativasRestantes : 0,
-      mensagem: MENSAGEM_NAO_CONFERIU,
-    };
+    return concluirConferencia(
+      ctx,
+      { contatoId, conexaoId, ferramentaDeConsulta: CONSULTA_DO_BANCO_EXTERNO },
+      estado,
+      confere,
+      agora,
+    );
   },
 };
+
+/**
+ * A cauda de toda conferência, depois de a fonte dizer se os dígitos conferem:
+ * aplica o resultado, grava a tentativa, abre o aviso na Central quando acabou
+ * de bloquear e devolve a resposta ao modelo. Gravar falhou LANÇA — o bloqueio é
+ * o que impede a força bruta, e uma tentativa que não ficou gravada não conta.
+ */
+export async function concluirConferencia(
+  ctx: Pick<McpContext, "supabase" | "organizationId">,
+  alvo: AlvoDaConferencia,
+  estado: EstadoDaConferencia | null,
+  confere: boolean,
+  agora: Date,
+): Promise<Record<string, unknown>> {
+  const desfecho = aplicarResultado(estado, confere, agora);
+  await gravarConferencia(ctx.supabase, ctx.organizationId, alvo.contatoId, alvo.conexaoId, desfecho.novo);
+
+  if (desfecho.acabouDeBloquear) {
+    try {
+      await avisarCentralDoBloqueio(ctx.supabase, ctx.organizationId, alvo.contatoId);
+    } catch (err) {
+      // O bloqueio já está gravado — é ele que protege o dado. O aviso que
+      // falhou vira log; o modelo segue instruído a passar para uma pessoa.
+      logger.warn("[conferencia-de-cpf] aviso na Central falhou", {
+        organizationId: ctx.organizationId,
+        erro: err instanceof Error ? err.message.slice(0, 200) : "desconhecido",
+      });
+    }
+    return respostaBloqueado();
+  }
+
+  if (confere) return respostaConferiu(alvo.ferramentaDeConsulta);
+  return {
+    confere: false,
+    tentativas_restantes: desfecho.situacao.tipo === "pendente" ? desfecho.situacao.tentativasRestantes : 0,
+    mensagem: MENSAGEM_NAO_CONFERIU,
+  };
+}
+
+/**
+ * A TRAVA DO CPF na consulta (issue #18). No turno de uma conversa, sem
+ * conferência válida do contato naquela fonte, a consulta NÃO sai — volta um
+ * erro em texto que ensina o modelo a pedir os dígitos e a usar
+ * `ferramentaDeConfirmacao`, sem dado nenhum. Ler o estado falhou = recusa
+ * (falha fechado). `null` = conferido, a consulta segue.
+ */
+export async function recusaPelaTravaDoCpf(
+  ctx: Pick<McpContext, "supabase" | "organizationId">,
+  contatoId: string,
+  conexaoId: string | null,
+  ferramentaDeConfirmacao: string,
+): Promise<Record<string, unknown> | null> {
+  let estado;
+  try {
+    estado = await lerConferencia(ctx.supabase, ctx.organizationId, contatoId, conexaoId);
+  } catch {
+    return {
+      erro: "conferencia_indisponivel",
+      mensagem:
+        "não foi possível confirmar a identidade do cliente agora, então os dados não podem ser " +
+        "mostrados. Diga que a equipe confirma.",
+    };
+  }
+  const situacao = situacaoDaConferencia(estado, new Date());
+  if (situacao.tipo === "verificado") return null;
+  if (situacao.tipo === "bloqueado") {
+    return {
+      erro: "identidade_bloqueada",
+      mensagem:
+        "a conferência de identidade deste cliente está bloqueada por excesso de tentativas. Não " +
+        "peça os dígitos de novo e não informe dado nenhum: diga que a equipe vai atendê-lo " +
+        "pessoalmente e passe a conversa para uma pessoa.",
+    };
+  }
+  return {
+    erro: "identidade_nao_conferida",
+    mensagem:
+      "antes de mostrar dados deste banco é preciso confirmar a identidade do cliente. Peça a ele " +
+      `os 3 últimos dígitos do CPF e chame ${ferramentaDeConfirmacao} com eles. Não consulte ` +
+      "de novo antes de a conferência dar certo, e não repita os dígitos na resposta.",
+  };
+}

@@ -6,8 +6,11 @@ import { consultar } from "./conexao";
 import {
   aplicarResultado,
   BLOQUEIO_APOS_ERROS_MS,
+  conferirCpfDoContato,
   conferirCpfNoBancoExterno,
   FUNCAO_DE_CONFERENCIA,
+  gravarConferencia,
+  lerConferencia,
   MAX_TENTATIVAS,
   situacaoDaConferencia,
   telefoneParaConferencia,
@@ -122,5 +125,80 @@ describe("conferirCpfNoBancoExterno", () => {
     expect(await conferirCpfNoBancoExterno({} as never, "+5511999998888", "123")).toBe(false);
     vi.mocked(consultar).mockResolvedValue({ rows: [] } as never);
     expect(await conferirCpfNoBancoExterno({} as never, "+5511999998888", "123")).toBe(false);
+  });
+});
+
+/** Cliente falso que grava a cadeia de filtros de uma leitura e o corpo de um upsert/rpc. */
+function clienteQueGrava(resposta: { data: unknown; error: { message: string } | null }) {
+  const filtros: Array<[string, string, unknown]> = [];
+  const upserts: Array<{ linha: Record<string, unknown>; opcoes: unknown }> = [];
+  const rpcs: Array<{ nome: string; args: unknown }> = [];
+  const consulta = {
+    select: () => consulta,
+    eq: (coluna: string, valor: unknown) => (filtros.push(["eq", coluna, valor]), consulta),
+    is: (coluna: string, valor: unknown) => (filtros.push(["is", coluna, valor]), consulta),
+    maybeSingle: async () => resposta,
+  };
+  const supabase = {
+    from: () => ({
+      ...consulta,
+      upsert: async (linha: Record<string, unknown>, opcoes: unknown) => {
+        upserts.push({ linha, opcoes });
+        return { error: resposta.error };
+      },
+    }),
+    rpc: async (nome: string, args: unknown) => (rpcs.push({ nome, args }), resposta),
+  };
+  return { supabase: supabase as never, filtros, upserts, rpcs };
+}
+
+describe("lerConferencia / gravarConferencia — a conexão nula é o cadastro do contato (0706)", () => {
+  it("com conexão, filtra connection_id por igualdade (o caminho do banco externo, inalterado)", async () => {
+    const c = clienteQueGrava({ data: null, error: null });
+    expect(await lerConferencia(c.supabase, "org-1", "ct-1", "conn-1")).toBeNull();
+    expect(c.filtros).toContainEqual(["eq", "connection_id", "conn-1"]);
+    expect(c.filtros.some(([op]) => op === "is")).toBe(false);
+  });
+
+  it("sem conexão, filtra connection_id IS NULL — `= null` não casaria linha nenhuma", async () => {
+    const c = clienteQueGrava({
+      data: { verificado_ate: null, tentativas_falhas: 2, bloqueado_ate: null },
+      error: null,
+    });
+    expect(await lerConferencia(c.supabase, "org-1", "ct-1", null)).toEqual({
+      verificadoAte: null,
+      tentativasFalhas: 2,
+      bloqueadoAte: null,
+    });
+    expect(c.filtros).toContainEqual(["is", "connection_id", null]);
+    expect(c.filtros).toContainEqual(["eq", "organization_id", "org-1"]);
+    expect(c.filtros.some(([op, coluna]) => op === "eq" && coluna === "connection_id")).toBe(false);
+  });
+
+  it("grava a linha de conexão nula pela mesma chave de conflito", async () => {
+    const c = clienteQueGrava({ data: null, error: null });
+    await gravarConferencia(c.supabase, "org-1", "ct-1", null, LIMPO);
+    expect(c.upserts[0]!.linha).toMatchObject({ organization_id: "org-1", contact_id: "ct-1", connection_id: null });
+    expect(c.upserts[0]!.opcoes).toEqual({ onConflict: "organization_id,contact_id,connection_id" });
+  });
+});
+
+describe("conferirCpfDoContato", () => {
+  it("pergunta ao banco por rpc e devolve o boolean dele — os dígitos só como argumento", async () => {
+    const c = clienteQueGrava({ data: true, error: null });
+    expect(await conferirCpfDoContato(c.supabase, "org-1", "ct-1", "123")).toBe(true);
+    expect(c.rpcs).toEqual([
+      { nome: "fn_conferir_cpf_do_contato", args: { p_org: "org-1", p_contato: "ct-1", p_digitos: "123" } },
+    ]);
+    expect(await conferirCpfDoContato(clienteQueGrava({ data: false, error: null }).supabase, "o", "c", "1")).toBe(false);
+  });
+
+  it("contato sem CPF (null do banco) volta null — não é 'não confere'", async () => {
+    expect(await conferirCpfDoContato(clienteQueGrava({ data: null, error: null }).supabase, "o", "c", "123")).toBeNull();
+  });
+
+  it("erro do banco LANÇA: não pode virar tentativa errada", async () => {
+    const c = clienteQueGrava({ data: null, error: { message: "boom" } });
+    await expect(conferirCpfDoContato(c.supabase, "o", "c", "123")).rejects.toThrow(/conferir_cpf_do_contato_falhou/);
   });
 });
