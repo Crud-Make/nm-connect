@@ -126,7 +126,10 @@ class ReadQuery {
       const data = r.rows.map((row) => row.j);
       return { data: this.one ? (data[0] ?? null) : data, error: null };
     } catch (e) {
-      return { data: null, error: { message: (e as Error).message } };
+      // O `code` do Postgres vai junto, como na resposta do PostgREST: é por ele que o
+      // export distingue "módulo não instalado" (42P01, seção vazia) de falha de leitura.
+      const { message, code } = e as { message: string; code?: string };
+      return { data: null, error: { message, code } };
     }
   }
 }
