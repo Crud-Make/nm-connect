@@ -4869,6 +4869,12 @@ export const DICIONARIO: Traducoes = {
   "Voltar para /app": { es: "Volver a /app" },
   "Menu de navegação": { es: "Menú de navegación" },
   "Abrir menu de navegação": { es: "Abrir menú de navegación" },
+  // ─── Menu lateral de seções da ficha do contato (components/contacts/MenuDeSecoes.tsx) ───
+  "Seções do contato": { es: "Secciones del contacto" },
+  "Abrir seções do contato": { es: "Abrir secciones del contacto" },
+  "Recolher seções do contato": { es: "Contraer secciones del contacto" },
+  "Mostrar seções do contato": { es: "Mostrar secciones del contacto" },
+  Timeline: { es: "Historial" },
   "Admin Plataforma": { es: "Admin de la plataforma" },
   "MODO PLATAFORMA": { es: "MODO PLATAFORMA" },
   "— operação cross-tenant": { es: "— operación cross-tenant" },
