@@ -187,3 +187,31 @@ describe("a lista não esconde canal nenhum", () => {
     expect(screen.getByText(ETIQUETA)).toBeInTheDocument();
   });
 });
+
+describe("o aviso de serviço do WhatsApp não configurado", () => {
+  const AVISO = "O serviço do WhatsApp não está configurado.";
+
+  it("some quando todos os números são do canal oficial, que não passa pelo serviço", () => {
+    listagem.data = [oficial];
+
+    render(wrap(<ConnectionsClient wahaConfigured={false} />));
+
+    expect(screen.queryByText(AVISO)).not.toBeInTheDocument();
+  });
+
+  it("aparece quando há número por QR, que depende do serviço", () => {
+    listagem.data = [oficial, porQr];
+
+    render(wrap(<ConnectionsClient wahaConfigured={false} />));
+
+    expect(screen.getByText(AVISO)).toBeInTheDocument();
+  });
+
+  it("aparece na instalação sem número nenhum, que ainda vai escolher por onde conectar", () => {
+    listagem.data = [];
+
+    render(wrap(<ConnectionsClient wahaConfigured={false} />));
+
+    expect(screen.getByText(AVISO)).toBeInTheDocument();
+  });
+});
