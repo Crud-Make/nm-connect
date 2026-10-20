@@ -24,6 +24,7 @@ import {
 } from "./template-binding";
 import { deriveTemplateContract } from "./template-contract";
 import { graphBaseUrl } from "./graph-base";
+import { destinatarioDaGraph } from "./bsuid";
 import { ehTempoEsgotado, GRAPH_TIMEOUT_ENVIO_MS } from "./erros-da-graph";
 
 export interface SendTemplateInput {
@@ -40,7 +41,10 @@ export interface SendTemplateInput {
    * campo por sessão (o parceiro) e um knob de instalação (o receiver de prova).
    */
   graphBase?: string;
-  /** Destinatário em dígitos E.164, sem `+` — é o que a Graph API aceita. */
+  /**
+   * Destinatário em dígitos E.164, sem `+` — ou o BSUID de quem chegou por
+   * username, sem telefone (`./bsuid.ts`). O corpo põe cada um no seu campo.
+   */
   to: string;
   binding: TemplateBinding;
   /**
@@ -130,7 +134,9 @@ export async function sendTemplate(input: SendTemplateInput): Promise<SendTempla
       },
       body: JSON.stringify({
         messaging_product: "whatsapp",
-        to: input.to,
+        // Telefone em `to`; BSUID em `recipient`. A doc aceita o BSUID em
+        // modelo de marketing/utilidade, não nos de autenticação.
+        ...destinatarioDaGraph(input.to),
         type: "template",
         template: {
           name: input.binding.name,

@@ -22,7 +22,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { metaContactsPayload } from "@/lib/channels/meta/contact-card";
 import { graphBaseUrl } from "@/lib/channels/meta/graph-base";
+import { bsuidOuNull, destinatarioDaGraph } from "@/lib/channels/meta/bsuid";
 import { postarMensagemNaGraph } from "@/lib/channels/meta/erros-da-graph";
+import { pedirTelefonePayload } from "@/lib/channels/meta/pedir-telefone";
 import { resolveMetaCreds } from "../meta/credentials";
 import type {
   ChannelAdapter,
@@ -97,9 +99,13 @@ export const metaCloudAdapter: ChannelAdapter = {
     // Devolver null é honesto — o chamador grava `missing_phone_number` em vez de
     // montar um endereço que a Meta recusaria.
     if (input.isGroup) return null;
-    if (!input.phoneNumber) return null;
-    const digits = toE164Digits(input.phoneNumber);
-    return digits.length > 0 ? digits : null;
+    // Telefone primeiro, sempre: com ele o envio é o de antes, byte a byte.
+    const digits = input.phoneNumber ? toE164Digits(input.phoneNumber) : "";
+    if (digits.length > 0) return digits;
+    // Sem telefone, o BSUID de quem chegou por username (`meta/bsuid.ts`). O
+    // endereço continua sendo UMA string: quem decide se ela vai em `to` ou em
+    // `recipient` é `destinatarioDaGraph`, no corpo do envio.
+    return bsuidOuNull(input.waBsuid);
   },
 
   /**
@@ -353,9 +359,32 @@ export const metaCloudAdapter: ChannelAdapter = {
       corpo: {
         messaging_product: "whatsapp",
         recipient_type: "individual",
-        to: envelope.to,
+        // Telefone em `to`; BSUID em `recipient` (contato sem telefone).
+        ...destinatarioDaGraph(envelope.to),
         ...corpo,
       },
+      prefixo: "meta",
+    });
+  },
+
+  /**
+   * O botão REQUEST_CONTACT_INFO (interativo) — ver `meta/pedir-telefone.ts`.
+   * Mesma credencial, mesmo teto e mesmos erros classificados do `send`.
+   */
+  async requestContactInfo(input): Promise<{ externalId: string | null }> {
+    const creds = await resolveMetaCreds(createAdminClient(), {
+      organizationId: input.organizationId,
+      phoneNumberId: input.sessionRef,
+    });
+    if (!creds) {
+      throw new Error(
+        "meta_not_configured: nenhuma credencial para esta sessão (nem na sessão, nem no ambiente).",
+      );
+    }
+    return postarMensagemNaGraph({
+      url: `${graphBaseUrl()}/${creds.phoneNumberId}/messages`,
+      token: creds.token,
+      corpo: pedirTelefonePayload(input.recipient, input.body),
       prefixo: "meta",
     });
   },

@@ -38,7 +38,7 @@ export interface SendTemplateForSessionInput {
    * fatia fecha, de volta pela porta dos fundos.
    */
   sessionRef: string;
-  /** Destinatário em dígitos E.164, já resolvido pelo adapter. */
+  /** Destinatário já resolvido pelo adapter: dígitos E.164 ou o BSUID (contato sem telefone). */
   to: string;
   name: string;
   language: string;
