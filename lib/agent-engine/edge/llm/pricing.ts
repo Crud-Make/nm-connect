@@ -87,6 +87,13 @@ const USD_PER_MTOK: Record<string, Preco> = {
   // Snapshot com preço PRÓPRIO: sem esta linha a tolerância ao sufixo de data o
   // cobraria como `gpt-4o` (armadilha 2 acima, com o sinal do defeito 1).
   'gpt-4o-2024-05-13': { input: 5, output: 15, cacheRead: 5, cacheWrite5m: 5, cacheWrite1h: 5 },
+  // Síntese de voz (resposta em nota de voz, `lib/messaging/voz/`). Tabela "Realtime and
+  // audio generation" de developers.openai.com/api/docs/pricing, conferida em 20/10/2026:
+  // US$ 0,60/MTok de TEXTO de entrada e US$ 12,00/MTok de ÁUDIO de saída. `output` aqui é o
+  // token de áudio. Sem cache no endpoint `/v1/audio/speech`: cache = entrada (sem efeito).
+  // O snapshot `gpt-4o-mini-tts-2025-12-15` não tem linha própria na página e cai nesta pela
+  // tolerância do sufixo de data.
+  'gpt-4o-mini-tts': { input: 0.6, output: 12, cacheRead: 0.6, cacheWrite5m: 0.6, cacheWrite1h: 0.6 },
   'gpt-5.6-terra': { input: 2, output: 12, cacheRead: 0.2, cacheWrite5m: 2.5, cacheWrite1h: 2.5 },
   // Preço promocional, válido até pelo menos 21/11/2026; revisar depois.
   'gpt-5.6-sol': { input: 4, output: 20, cacheRead: 0.4, cacheWrite5m: 5, cacheWrite1h: 5 },

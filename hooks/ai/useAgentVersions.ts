@@ -25,6 +25,9 @@ export interface AgentVersionRow {
   handoff_tool_enabled: boolean;
   /** Passagem por ASSUNTO JURÍDICO ligada nesta versão (#2156). Padrão: `true`. */
   handoff_legal_enabled: boolean;
+  voice_reply_enabled: boolean;
+  voice_reply_voice: string;
+  voice_reply_instructions: string | null;
   proposal_ai_draft_enabled: boolean;
   cases_enabled: boolean;
   operator_enabled: boolean;

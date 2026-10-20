@@ -1820,6 +1820,9 @@ export type Database = {
           handoff_keywords: string[]
           handoff_tool_enabled: boolean
           handoff_legal_enabled: boolean
+          voice_reply_enabled: boolean
+          voice_reply_instructions: string | null
+          voice_reply_voice: string
           proposal_ai_draft_enabled: boolean
           history_message_window: number
           history_token_window: number
@@ -1860,6 +1863,9 @@ export type Database = {
           handoff_keywords?: string[]
           handoff_tool_enabled?: boolean
           handoff_legal_enabled?: boolean
+          voice_reply_enabled?: boolean
+          voice_reply_instructions?: string | null
+          voice_reply_voice?: string
           proposal_ai_draft_enabled?: boolean
           history_message_window?: number
           history_token_window?: number
@@ -1900,6 +1906,9 @@ export type Database = {
           handoff_keywords?: string[]
           handoff_tool_enabled?: boolean
           handoff_legal_enabled?: boolean
+          voice_reply_enabled?: boolean
+          voice_reply_instructions?: string | null
+          voice_reply_voice?: string
           proposal_ai_draft_enabled?: boolean
           history_message_window?: number
           history_token_window?: number
