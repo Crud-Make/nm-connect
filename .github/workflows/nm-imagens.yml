@@ -1,0 +1,83 @@
+name: nm-imagens
+
+# Imagens Docker do NM Connect, construídas no GitHub a cada merge na `main`.
+#
+# A máquina de dev só BAIXA o resultado (docker-compose.local.nm.yml +
+# scripts/nm/atualizar-stack-local.sh) em vez de compilar 20–30 min. Fluxo e o
+# passo único de deixar os pacotes públicos: docs/nm/sem-waha.md.
+#
+# Não é o publish-image.yml do upstream, que segue desligado: aquele publica o
+# artefato do self-hoster (quatro imagens, amd64 + arm64, tags de release, smoke
+# de boot). Este reusa os mesmos Dockerfiles, build-arg e cache do buildx, e
+# publica só o que a stack local usa: app, worker e scheduler, linux/amd64.
+#
+# As imagens são genéricas: os NEXT_PUBLIC_* entram em runtime (ver Dockerfile),
+# então a mesma imagem serve a qualquer máquina. Tags: `main` (a mais nova) e
+# `sha-<7>` (o commit), para voltar a uma versão com NM_IMAGEM_TAG.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+# Merge novo na main supera o build em curso: a tag `main` só precisa do mais novo.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGENS: ghcr.io/crud-make/nm-connect
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - imagem: app
+            dockerfile: Dockerfile
+          - imagem: worker
+            dockerfile: Dockerfile.worker
+          - imagem: scheduler
+            dockerfile: Dockerfile.scheduler
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Os labels gerados aqui (source, revision) vencem o LABEL do Dockerfile,
+      # que aponta para o upstream: é o `source` que liga o pacote a este repo.
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGENS }}-${{ matrix.imagem }}
+          tags: |
+            type=ref,event=branch
+            type=sha
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_VERSION=${{ github.sha }}
+          cache-from: type=gha,scope=nm-${{ matrix.imagem }}
+          cache-to: type=gha,mode=max,scope=nm-${{ matrix.imagem }}

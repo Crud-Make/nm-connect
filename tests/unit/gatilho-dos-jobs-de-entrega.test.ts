@@ -247,6 +247,13 @@ const GATILHO_ESPERADO: Record<string, { condicao: string | null; efeito: string
       "Este é o check obrigatório `nm-ci-ok` do fork NM Connect, a fachada da matriz " +
       "`verify`. Precisa de `always()` para ler o resultado das partes e reprovar `skipped`.",
   },
+  "nm-imagens.yml::publicar": {
+    condicao: null,
+    efeito:
+      "Este job publica no GHCR as imagens app, worker e scheduler que a stack local do " +
+      "NM Connect baixa. Uma condição aqui deixaria a tag `main` parada num commit antigo, " +
+      "sem erro: a máquina de dev seguiria subindo código velho.",
+  },
 
   // --- e o que legitimamente tem interruptor -----------------------------------
   "acolhida.yml::acolher": {

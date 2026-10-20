@@ -54,6 +54,9 @@ const DIR = join(process.cwd(), ".github/workflows");
 const ESCRITA_JUSTIFICADA: Record<string, string> = {
   "publish-image.yml::packages: write":
     "publica a imagem do app no GHCR — é o artefato que o self-hoster instala",
+  "nm-imagens.yml::packages: write":
+    "publica no GHCR do próprio repositório as imagens que a stack local do NM Connect baixa " +
+    "(ghcr.io/crud-make/nm-connect-*), para a máquina de dev não compilar",
   "vigia-de-colisao.yml::pull-requests: write":
     "comenta e rotula o PR cujo número de migration foi tomado depois de ele ficar verde; " +
     "é o mínimo que escreve (um comentário editado por PR + o rótulo), o workflow não roda " +
