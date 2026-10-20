@@ -6,7 +6,7 @@
  * Fonte: as 13 vozes embutidas do `gpt-4o-mini-tts`, na ordem da referência
  * oficial de `POST /v1/audio/speech` (conferida em 20/10/2026). A doc recomenda
  * `marin` ou `cedar` para melhor qualidade — por isso `marin` é a padrão (e o
- * default da coluna `ai_agent_versions.voice_reply_voice`, migration 0677).
+ * default da coluna `ai_agent_versions.voice_reply_voice`, migration 0704).
  */
 export const VOZES_DE_FALA = [
   "alloy",
@@ -27,7 +27,7 @@ export type VozDeFala = (typeof VOZES_DE_FALA)[number];
 
 export const VOZ_PADRAO: VozDeFala = "marin";
 
-/** Teto da instrução de tom guardada na versão do agente (o CHECK da 0677 repete). */
+/** Teto da instrução de tom guardada na versão do agente (o CHECK da 0704 repete). */
 export const LIMITE_DA_INSTRUCAO_DE_TOM = 500;
 
 export function vozValida(v: string | null | undefined): VozDeFala {

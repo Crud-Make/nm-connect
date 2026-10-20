@@ -22,7 +22,7 @@ export interface ValorDaRespostaEmAudio {
 }
 
 /**
- * Cartão "Resposta em nota de voz" na versão do agente (migration 0677).
+ * Cartão "Resposta em nota de voz" na versão do agente (migration 0704).
  *
  * Desligado por padrão. O efeito mora no turno (`inbound-turn.ts`): quando a
  * mensagem do cliente que abriu o turno é nota de voz, o texto que JÁ passou

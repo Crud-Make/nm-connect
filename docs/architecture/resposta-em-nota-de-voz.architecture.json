@@ -3,7 +3,7 @@
   "diagram_type": "architecture",
   "meta": {
     "title": "Resposta em nota de voz",
-    "subtitle": "Cliente mandou áudio, a IA responde em áudio — só depois de o texto passar por toda a cadeia before_send (migration 0677)",
+    "subtitle": "Cliente mandou áudio, a IA responde em áudio — só depois de o texto passar por toda a cadeia before_send (migration 0704)",
     "output": "resposta-em-nota-de-voz.html",
     "quality_profile": "standard"
   },

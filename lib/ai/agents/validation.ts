@@ -180,7 +180,7 @@ const versionShapeSchema = z
     // `true` porque quem não mexer tem de ficar com o resultado de hoje; o
     // efeito da chave (trocar a descrição da ferramenta) mora no turno.
     handoff_legal_enabled: z.boolean().default(true),
-    // Responder áudio com áudio (migration 0677) — DESLIGADO por padrão: quem
+    // Responder áudio com áudio (migration 0704) — DESLIGADO por padrão: quem
     // não mexer continua recebendo texto. A voz é da lista da OpenAI
     // (`lib/messaging/voz/vozes.ts`); a instrução só muda o tom, nunca o que é dito.
     voice_reply_enabled: z.boolean().default(false),

@@ -2,7 +2,7 @@
  * RESPOSTA EM NOTA DE VOZ — a decisão e as duas etapas, sem I/O próprio.
  *
  * Quem liga: a versão publicada do agente (`ai_agent_versions.voice_reply_*`,
- * migration 0677), na tela do agente — "Responder áudio com áudio", DESLIGADO
+ * migration 0704), na tela do agente — "Responder áudio com áudio", DESLIGADO
  * por padrão. Quem dispara: a mensagem do cliente que abriu o turno ser uma
  * nota de voz (`messages.type = 'audio'`). Cliente que escreve recebe texto,
  * como sempre.

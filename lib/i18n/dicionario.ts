@@ -15522,7 +15522,7 @@ export const DICIONARIO: Traducoes = {
   "Setores agrupam quem atende cada área. Quando o roteador de IA leva a conversa para um setor, só os membros dele a recebem; se ninguém do setor estiver de plantão, ela espera na fila.": { es: "Los sectores agrupan a quienes atienden cada área. Cuando el enrutador de IA lleva la conversación a un sector, solo sus miembros la reciben; si nadie del sector está de guardia, espera en la cola." },
   "Todos os setores": { es: "Todos los sectores" },
   "Um dos membros não faz parte desta organização.": { es: "Uno de los miembros no forma parte de esta organización." },
-  // Resposta em nota de voz (migration 0677).
+  // Resposta em nota de voz (migration 0704).
   "Resposta em nota de voz": { es: "Respuesta en nota de voz" },
   "Responder áudio com áudio": { es: "Responder audio con audio" },
   "Quando o cliente manda uma nota de voz, a resposta sai em nota de voz. Se ele escreve, a resposta é texto. A voz só fala o que já passou por todas as travas de envio; se ela falhar, o texto vai no lugar.": { es: "Cuando el cliente manda una nota de voz, la respuesta sale en nota de voz. Si escribe, la respuesta es texto. La voz solo dice lo que ya pasó por todos los controles de envío; si falla, se envía el texto en su lugar." },

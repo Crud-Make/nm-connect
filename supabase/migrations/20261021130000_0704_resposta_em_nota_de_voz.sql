@@ -1,5 +1,5 @@
 -- manifest: Resposta da IA em nota de voz — três colunas novas em `ai_agent_versions` (`voice_reply_enabled`, desligado por padrão; `voice_reply_voice`; `voice_reply_instructions`), a trava de imutabilidade cobrindo as três, e o preço do `gpt-4o-mini-tts` em `ai_pricing` para a síntese contar no teto de gasto.
--- 0677 — Quando o cliente manda NOTA DE VOZ, o agente pode responder em nota
+-- 0704 — Quando o cliente manda NOTA DE VOZ, o agente pode responder em nota
 -- de voz. Decisão do dono do produto, com quatro condições, e três delas moram
 -- nesta migration:
 --
@@ -114,7 +114,7 @@ create trigger trg_ai_agent_versions_content_immutable
 insert into public.ai_pricing
   (model, prompt_cents_per_million_tokens, completion_cents_per_million_tokens, notes)
 values
-  ('gpt-4o-mini-tts', 60, 1200, 'catálogo 0677 — voz: texto de entrada e áudio de saída, developers.openai.com/api/docs/pricing 2026-10-20')
+  ('gpt-4o-mini-tts', 60, 1200, 'catálogo 0704 — voz: texto de entrada e áudio de saída, developers.openai.com/api/docs/pricing 2026-10-20')
 on conflict (model) do update set
   prompt_cents_per_million_tokens = excluded.prompt_cents_per_million_tokens,
   completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,

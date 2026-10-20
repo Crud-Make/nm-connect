@@ -52052,15 +52052,15 @@ $fn$;
 revoke all on function public.fn_carga_e_rodizio_dos_atendentes(uuid, uuid[], text[], uuid) from public, anon, authenticated;
 grant execute on function public.fn_carga_e_rodizio_dos_atendentes(uuid, uuid[], text[], uuid) to service_role;
 
--- ---- resposta da IA em nota de voz na versão do agente (migration 0677) ----
--- 0677: `voice_reply_enabled boolean not null default false`, `voice_reply_voice`
+-- ---- resposta da IA em nota de voz na versão do agente (migration 0704) ----
+-- 0704: `voice_reply_enabled boolean not null default false`, `voice_reply_voice`
 -- e `voice_reply_instructions` em `ai_agent_versions` — DESLIGADO por padrão,
 -- por AGENTE, na versão publicada. A trava de imutabilidade passa a cobrir as
 -- três colunas, e `ai_pricing` ganha a tarifa do `gpt-4o-mini-tts` para a voz
 -- contar no teto de gasto. O efeito no turno mora em
 -- `lib/agent-engine/agent/inbound-turn.ts` (e em `lib/messaging/voz/`).
 --
--- O bloco de baixo é IDEMPOTENTE (mesmo do .sql da 0677, byte a byte). Fica
+-- O bloco de baixo é IDEMPOTENTE (mesmo do .sql da 0704, byte a byte). Fica
 -- ANTES da VARREDURA anon porque recria `fn_ai_agent_version_content_immutable`
 -- (`tests/unit/varredura-anon-e-o-ultimo-bloco.test.ts`).
 
@@ -52145,7 +52145,7 @@ create trigger trg_ai_agent_versions_content_immutable
 insert into public.ai_pricing
   (model, prompt_cents_per_million_tokens, completion_cents_per_million_tokens, notes)
 values
-  ('gpt-4o-mini-tts', 60, 1200, 'catálogo 0677 — voz: texto de entrada e áudio de saída, developers.openai.com/api/docs/pricing 2026-10-20')
+  ('gpt-4o-mini-tts', 60, 1200, 'catálogo 0704 — voz: texto de entrada e áudio de saída, developers.openai.com/api/docs/pricing 2026-10-20')
 on conflict (model) do update set
   prompt_cents_per_million_tokens = excluded.prompt_cents_per_million_tokens,
   completion_cents_per_million_tokens = excluded.completion_cents_per_million_tokens,

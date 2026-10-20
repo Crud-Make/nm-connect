@@ -2951,7 +2951,7 @@ async function executarTurnoDoAgente(
   // turno com dois vetos ficaria mudo por mais de 20 segundos: o conserto do
   // "rápido demais" viraria o defeito simétrico, mais caro que o original.
   let jaEsperouComoHumano = false;
-  // ── RESPOSTA EM NOTA DE VOZ (migration 0677, `lib/messaging/voz/`) ─────────
+  // ── RESPOSTA EM NOTA DE VOZ (migration 0704, `lib/messaging/voz/`) ─────────
   //
   // A decisão é por turno: o agente ligou "Responder áudio com áudio" E a
   // mensagem que abriu ESTE turno (`inbound_message_id`) é nota de voz. Lida

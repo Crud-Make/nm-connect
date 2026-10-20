@@ -46,7 +46,7 @@ export interface PublishedAgentConfig {
    */
   handoffLegalEnabled?: boolean;
   /**
-   * Responder áudio com áudio (migration 0677): quando a mensagem do cliente
+   * Responder áudio com áudio (migration 0704): quando a mensagem do cliente
    * que abriu o turno é nota de voz, o texto APROVADO pela cadeia before_send
    * sai como nota de voz. Opcional pelo mesmo motivo de `handoffLegalEnabled`;
    * ausente = desligado, que é o padrão do banco. Consumidor: `inbound-turn.ts`

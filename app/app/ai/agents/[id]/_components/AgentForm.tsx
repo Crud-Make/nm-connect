@@ -195,7 +195,7 @@ interface FormState {
    * jurídica". Padrão LIGADO (`?? true` abaixo), como a coluna na versão.
    */
   handoff_legal_enabled: boolean;
-  /** Responder áudio com áudio (0677). Padrão DESLIGADO. */
+  /** Responder áudio com áudio (0704). Padrão DESLIGADO. */
   voice_reply_enabled: boolean;
   voice_reply_voice: string;
   /** "" = sem instrução de tom (vira null no payload). */
@@ -1249,7 +1249,7 @@ export function AgentForm(props: Props) {
             ) : null}
           </Card>
 
-          {/* Resposta em nota de voz (0677) */}
+          {/* Resposta em nota de voz (0704) */}
           <RespostaEmAudio
             value={{
               voice_reply_enabled: form.voice_reply_enabled,
