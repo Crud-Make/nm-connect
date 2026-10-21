@@ -7,7 +7,7 @@
  * (`lib/branding/css.ts`) emite `--color-brand` e a família do accent
  * (`--color-accent-{50..950}`, `-fg`, `-hover`, `-soft`) e mais nada — medido:
  * `grep -c color-bg lib/branding/css.ts` devolve 1, e essa única ocorrência
- * está dentro de um comentário sobre contraste. Logo `#faf9f6` / `#161510` são
+ * está dentro de um comentário sobre contraste. Logo `#f8fafc` / `#00041a` são
  * a cor CERTA da barra para qualquer marca, e um `generateViewport()` lendo o
  * banco custaria uma leitura por requisição para devolver sempre a mesma
  * constante. Isto está escrito aqui porque a leitura apressada ("a barra tem a

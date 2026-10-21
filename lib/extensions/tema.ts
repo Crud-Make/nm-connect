@@ -17,7 +17,7 @@
  * O `app/globals.css` declara as MESMAS custom properties em `:root` (claro) e
  * em `[data-theme="dark"]` (escuro) — fundo, superfície e texto têm valores
  * distintos por tema. Um mapa plano por token não conseguiria dizer "o fundo
- * claro é #faf9f6 e o escuro é #161510" sem inventar nome de token. Dois mapas,
+ * claro é #f8fafc e o escuro é #00041a" sem inventar nome de token. Dois mapas,
  * um por tema, espelham exatamente como o produto já separa os dois blocos. Os
  * 11 stops da rampa (`--color-accent-NNN`) têm o mesmo valor nos dois temas e
  * podem ir só no `claro`. Todo o resto (fundo, superfície, texto, borda e os
