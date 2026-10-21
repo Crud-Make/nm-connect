@@ -15,9 +15,9 @@ export const TRILHAS: ReadonlyArray<{ trilha: TrilhaDeCor; nome: string }> = [
   { trilha: 1, nome: "Telha" },
   { trilha: 2, nome: "Âmbar" },
   { trilha: 3, nome: "Oliva" },
-  { trilha: 4, nome: "Turquesa" },
-  { trilha: 5, nome: "Azul" },
-  { trilha: 6, nome: "Índigo" },
+  { trilha: 4, nome: "Verde" },
+  { trilha: 5, nome: "Turquesa" },
+  { trilha: 6, nome: "Azul" },
   { trilha: 7, nome: "Violeta" },
   { trilha: 8, nome: "Framboesa" },
 ];
