@@ -40,7 +40,7 @@ def run(text, wght, size, x0, baseline, tracking=0.0):
     return " ".join(d), x
 
 
-ACC='#B3261E'; ACC_D='#EF6B63'; INK='#1B1A17'; PAPER='#F2F0EA'
+ACC='#0A5ADB'; ACC_D='#5794FF'; INK='#0F1729'; PAPER='#E7F0F9'
 def r(d): return re.sub(r'-?\d+\.\d+', lambda m: ('%.2f'%float(m.group())).rstrip('0').rstrip('.'), d)
 # simbolo em 64x64
 BUBBLE='M21 13H43A9 9 0 0 1 52 22V36A9 9 0 0 1 43 45H24L15 53V44.2A9 9 0 0 1 12 36V22A9 9 0 0 1 21 13Z'
