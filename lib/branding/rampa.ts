@@ -10,9 +10,10 @@
  * pré-buildada e cada dependência nova é superfície de advisory num produto que o
  * cliente hospeda. As conversões (sRGB ↔ OKLab, de Björn Ottosson) cabem em 60 linhas.
  *
- * A régua é `app/globals.css`. `rampaDeSemente('#506d48')` reproduz os 11 stops Sage
- * com Δ ≤ 2/255 por canal — medido, e vigiado por
- * `tests/unit/branding-rampa.test.ts`, que LÊ os stops esperados do próprio CSS.
+ * A rampa do produto em `app/globals.css` é `rampaDeSemente('#0a5adb')`. A calibração
+ * contra uma rampa desenhada à mão usa a Sage do laboratório (`PALETTES.sage`):
+ * `rampaDeSemente('#506d48')` a reproduz com Δ ≤ 2/255 por canal — medido, e vigiado
+ * por `tests/unit/branding-rampa.test.ts`.
  */
 
 // ── Tipos ────────────────────────────────────────────────────────────────────

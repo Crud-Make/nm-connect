@@ -25,70 +25,72 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 /* ─────────────────────────────────────────────────────────────────────────
-   DeskcommCRM — Design System tokens (Sage palette · density Aerada)
-   Source of truth: /app/design/lib/tokens.ts (PALETTES.sage)
+   NM Connect — Design System tokens (paleta NM · density Aerada)
+   Paleta trazida do NM ONE (`src/index.css`): azul #0a5adb como semente da
+   rampa (`rampaDeSemente`), neutros slate e escuro azul-noite. As outras
+   paletas do laboratório seguem em /app/design/lib/tokens.ts (PALETTES).
    Light + dark drawn separately (NOT inverted).
    ───────────────────────────────────────────────────────────────────────── */
 
 :root {
   /* Surfaces (light) */
-  --color-bg: #faf9f6;
+  --color-bg: #f8fafc;
   --color-surface: #ffffff;
-  --color-surface-elevated: #f5f3ee;
-  --color-overlay: rgba(28, 26, 22, 0.42);
+  --color-surface-elevated: #eef2f6;
+  --color-overlay: rgba(15, 23, 41, 0.42);
 
   /* Text (light) */
-  --color-text: #1c1a16;
-  --color-text-muted: #5d594f;
-  --color-text-subtle: #7d786c;
+  --color-text: #0f1729;
+  --color-text-muted: #5a687c;
+  --color-text-subtle: #6f8095;
 
   /* Borders (light) */
-  --color-border: #e7e3da;
-  --color-border-strong: #d2cdbf;
+  --color-border: #d0d8e1;
+  --color-border-strong: #b3becc;
 
-  /* Accent — Sage (11 stops) */
-  --color-accent-50: #f3f6f1;
-  --color-accent-100: #e4ebe0;
-  --color-accent-200: #c8d6c1;
-  --color-accent-300: #a4ba9a;
-  --color-accent-400: #82a077;
-  --color-accent-500: #67885d;
-  --color-accent-600: #506d48;
-  --color-accent-700: #41573b;
-  --color-accent-800: #374731;
-  --color-accent-900: #2f3c2b;
-  --color-accent-950: #171f15;
+  /* Accent — azul NM (11 stops, `rampaDeSemente('#0a5adb')`) */
+  --color-accent-50: #f0f5ff;
+  --color-accent-100: #dde9ff;
+  --color-accent-200: #b9d3ff;
+  --color-accent-300: #88b4ff;
+  --color-accent-400: #5794ff;
+  --color-accent-500: #2575ff;
+  --color-accent-600: #0a5adb;
+  --color-accent-700: #124aaa;
+  --color-accent-800: #143e88;
+  --color-accent-900: #15366f;
+  --color-accent-950: #081b3d;
   --color-accent: var(--color-accent-600);
   --color-accent-fg: #ffffff;
   --color-accent-soft: var(--color-accent-100);
   --color-accent-hover: var(--color-accent-700);
 
-  /* Neutrals — greige (11 stops, light) */
-  --color-neutral-50: #faf9f6;
-  --color-neutral-100: #f3f1ec;
-  --color-neutral-200: #e7e3da;
-  --color-neutral-300: #d2cdbf;
-  --color-neutral-400: #a9a395;
-  --color-neutral-500: #7d786c;
-  --color-neutral-600: #5d594f;
-  --color-neutral-700: #46433b;
-  --color-neutral-800: #2e2c26;
-  --color-neutral-900: #1c1a16;
-  --color-neutral-950: #0e0d0a;
+  /* Neutrals — slate (11 stops, light) */
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #eef2f6;
+  --color-neutral-200: #d0d8e1;
+  --color-neutral-300: #b3becc;
+  --color-neutral-400: #8f9cae;
+  --color-neutral-500: #6f8095;
+  --color-neutral-600: #5a687c;
+  --color-neutral-700: #3e4c60;
+  --color-neutral-800: #232f43;
+  --color-neutral-900: #0f1729;
+  --color-neutral-950: #070b18;
 
   /* States (light) */
-  --color-success: #5a8a5f;
-  --color-success-bg: rgba(90, 138, 95, 0.12);
-  --color-success-fg: #41673f;
-  --color-warning: #b07a2b;
-  --color-warning-bg: rgba(176, 122, 43, 0.12);
-  --color-warning-fg: #875a1a;
-  --color-error: #a94a3c;
-  --color-error-bg: rgba(169, 74, 60, 0.12);
-  --color-error-fg: #8a3a2e;
-  --color-info: #4a7a93;
-  --color-info-bg: rgba(74, 122, 147, 0.12);
-  --color-info-fg: #355d72;
+  --color-success: #218c5a;
+  --color-success-bg: rgba(33, 140, 90, 0.12);
+  --color-success-fg: #125e3b;
+  --color-warning: #ae741e;
+  --color-warning-bg: rgba(174, 116, 30, 0.12);
+  --color-warning-fg: #79420c;
+  --color-error: #d32222;
+  --color-error-bg: rgba(211, 34, 34, 0.12);
+  --color-error-fg: #972020;
+  --color-info: #1277a5;
+  --color-info-bg: rgba(18, 119, 165, 0.12);
+  --color-info-fg: #0a5076;
 
   /* Spacing (4-base) */
   --space-0: 0px;
@@ -115,11 +117,11 @@
   --radius-full: 9999px;
 
   /* Shadows — desaturated, neutral-based */
-  --shadow-xs: 0 1px 2px 0 rgba(20, 18, 14, 0.04);
-  --shadow-sm: 0 1px 2px 0 rgba(20, 18, 14, 0.05), 0 1px 1px 0 rgba(20, 18, 14, 0.03);
-  --shadow-md: 0 4px 12px -2px rgba(20, 18, 14, 0.06), 0 2px 4px -1px rgba(20, 18, 14, 0.04);
-  --shadow-lg: 0 12px 32px -6px rgba(20, 18, 14, 0.1), 0 4px 12px -2px rgba(20, 18, 14, 0.06);
-  --shadow-xl: 0 24px 48px -12px rgba(20, 18, 14, 0.16), 0 8px 16px -4px rgba(20, 18, 14, 0.08);
+  --shadow-xs: 0 1px 2px 0 rgba(15, 23, 41, 0.04);
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 41, 0.05), 0 1px 1px 0 rgba(15, 23, 41, 0.03);
+  --shadow-md: 0 4px 12px -2px rgba(15, 23, 41, 0.06), 0 2px 4px -1px rgba(15, 23, 41, 0.04);
+  --shadow-lg: 0 12px 32px -6px rgba(15, 23, 41, 0.1), 0 4px 12px -2px rgba(15, 23, 41, 0.06);
+  --shadow-xl: 0 24px 48px -12px rgba(15, 23, 41, 0.16), 0 8px 16px -4px rgba(15, 23, 41, 0.08);
 
   /* Density — Aerada */
   --density-row: 56px;
@@ -205,8 +207,10 @@
    * equipe. Por isso Telha, Âmbar, Oliva, Turquesa, Azul, Índigo, Violeta,
    * Framboesa: oito palavras diferentes.
    *
-   * A faixa 113-165 é vetada: é onde mora a accent Sage (139 graus). Cor de
-   * PESSOA não pode ser confundida com cor de ESTADO do sistema.
+   * A faixa 113-165 foi vetada quando a accent era a Sage (139 graus). Cor de
+   * PESSOA não pode ser confundida com cor de ESTADO do sistema. Com a accent
+   * azul NM (261 graus) o veto não protege mais nada e o Índigo (262) caiu
+   * em cima dela: as oito trilhas precisam ser derivadas de novo.
    *
    * A luminosidade ALTERNA entre vizinhos, que é o truque da Okabe-Ito para
    * separar o azul-céu do azul — e foi exatamente o que a minha versão
@@ -254,7 +258,7 @@
    As 11 paradas `--color-accent-NNN` ficam DE FORA de propósito. Elas são
    idênticas nos dois blocos do produto, então omiti-las não muda pixel algum
    aqui; e, na instalação que trocou a cor, a subárvore clara passa a herdar a
-   rampa do `<html>` (a do revendedor) em vez de fixar a Sage. Pelo mesmo
+   rampa do `<html>` (a do revendedor) em vez de fixar a do produto. Pelo mesmo
    motivo os papéis abaixo mantêm a forma `var(--color-accent-NNN)`.
 
    Buraco conhecido: `--color-accent-fg` é literal `#ffffff` e, numa subárvore
@@ -263,47 +267,47 @@
    (lib/branding/css.ts), que só ganha consumidor com a tela de marca.
    ───────────────────────────────────────────────────────────────────────── */
 [data-theme="light"] {
-  --color-bg: #faf9f6;
+  --color-bg: #f8fafc;
   --color-surface: #ffffff;
-  --color-surface-elevated: #f5f3ee;
-  --color-overlay: rgba(28, 26, 22, 0.42);
-  --color-text: #1c1a16;
-  --color-text-muted: #5d594f;
-  --color-text-subtle: #7d786c;
-  --color-border: #e7e3da;
-  --color-border-strong: #d2cdbf;
+  --color-surface-elevated: #eef2f6;
+  --color-overlay: rgba(15, 23, 41, 0.42);
+  --color-text: #0f1729;
+  --color-text-muted: #5a687c;
+  --color-text-subtle: #6f8095;
+  --color-border: #d0d8e1;
+  --color-border-strong: #b3becc;
   --color-accent: var(--color-accent-600);
   --color-accent-fg: #ffffff;
   --color-accent-soft: var(--color-accent-100);
   --color-accent-hover: var(--color-accent-700);
-  --color-neutral-50: #faf9f6;
-  --color-neutral-100: #f3f1ec;
-  --color-neutral-200: #e7e3da;
-  --color-neutral-300: #d2cdbf;
-  --color-neutral-400: #a9a395;
-  --color-neutral-500: #7d786c;
-  --color-neutral-600: #5d594f;
-  --color-neutral-700: #46433b;
-  --color-neutral-800: #2e2c26;
-  --color-neutral-900: #1c1a16;
-  --color-neutral-950: #0e0d0a;
-  --color-success: #5a8a5f;
-  --color-success-bg: rgba(90, 138, 95, 0.12);
-  --color-success-fg: #41673f;
-  --color-warning: #b07a2b;
-  --color-warning-bg: rgba(176, 122, 43, 0.12);
-  --color-warning-fg: #875a1a;
-  --color-error: #a94a3c;
-  --color-error-bg: rgba(169, 74, 60, 0.12);
-  --color-error-fg: #8a3a2e;
-  --color-info: #4a7a93;
-  --color-info-bg: rgba(74, 122, 147, 0.12);
-  --color-info-fg: #355d72;
-  --shadow-xs: 0 1px 2px 0 rgba(20, 18, 14, 0.04);
-  --shadow-sm: 0 1px 2px 0 rgba(20, 18, 14, 0.05), 0 1px 1px 0 rgba(20, 18, 14, 0.03);
-  --shadow-md: 0 4px 12px -2px rgba(20, 18, 14, 0.06), 0 2px 4px -1px rgba(20, 18, 14, 0.04);
-  --shadow-lg: 0 12px 32px -6px rgba(20, 18, 14, 0.1), 0 4px 12px -2px rgba(20, 18, 14, 0.06);
-  --shadow-xl: 0 24px 48px -12px rgba(20, 18, 14, 0.16), 0 8px 16px -4px rgba(20, 18, 14, 0.08);
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #eef2f6;
+  --color-neutral-200: #d0d8e1;
+  --color-neutral-300: #b3becc;
+  --color-neutral-400: #8f9cae;
+  --color-neutral-500: #6f8095;
+  --color-neutral-600: #5a687c;
+  --color-neutral-700: #3e4c60;
+  --color-neutral-800: #232f43;
+  --color-neutral-900: #0f1729;
+  --color-neutral-950: #070b18;
+  --color-success: #218c5a;
+  --color-success-bg: rgba(33, 140, 90, 0.12);
+  --color-success-fg: #125e3b;
+  --color-warning: #ae741e;
+  --color-warning-bg: rgba(174, 116, 30, 0.12);
+  --color-warning-fg: #79420c;
+  --color-error: #d32222;
+  --color-error-bg: rgba(211, 34, 34, 0.12);
+  --color-error-fg: #972020;
+  --color-info: #1277a5;
+  --color-info-bg: rgba(18, 119, 165, 0.12);
+  --color-info-fg: #0a5076;
+  --shadow-xs: 0 1px 2px 0 rgba(15, 23, 41, 0.04);
+  --shadow-sm: 0 1px 2px 0 rgba(15, 23, 41, 0.05), 0 1px 1px 0 rgba(15, 23, 41, 0.03);
+  --shadow-md: 0 4px 12px -2px rgba(15, 23, 41, 0.06), 0 2px 4px -1px rgba(15, 23, 41, 0.04);
+  --shadow-lg: 0 12px 32px -6px rgba(15, 23, 41, 0.1), 0 4px 12px -2px rgba(15, 23, 41, 0.06);
+  --shadow-xl: 0 24px 48px -12px rgba(15, 23, 41, 0.16), 0 8px 16px -4px rgba(15, 23, 41, 0.08);
   --background: var(--color-bg);
   --foreground: var(--color-text);
   --card: var(--color-surface);
@@ -341,63 +345,63 @@
 
 [data-theme="dark"] {
   /* Surfaces (dark — drawn) */
-  --color-bg: #161510;
-  --color-surface: #1d1c17;
-  --color-surface-elevated: #272620;
+  --color-bg: #00041a;
+  --color-surface: #081526;
+  --color-surface-elevated: #122136;
   --color-overlay: rgba(0, 0, 0, 0.55);
 
   /* Text (dark) */
-  --color-text: #f5f4ef;
-  --color-text-muted: #8e8b7f;
-  --color-text-subtle: #605e54;
+  --color-text: #e7f0f9;
+  --color-text-muted: #85a1c1;
+  --color-text-subtle: #597291;
 
   /* Borders (dark) */
-  --color-border: #33312a;
-  --color-border-strong: #444239;
+  --color-border: #1b2e46;
+  --color-border-strong: #283f5d;
 
   /* Accent stays same hex stops; default shifts up for dark contrast */
-  --color-accent-50: #f3f6f1;
-  --color-accent-100: #e4ebe0;
-  --color-accent-200: #c8d6c1;
-  --color-accent-300: #a4ba9a;
-  --color-accent-400: #82a077;
-  --color-accent-500: #67885d;
-  --color-accent-600: #506d48;
-  --color-accent-700: #41573b;
-  --color-accent-800: #374731;
-  --color-accent-900: #2f3c2b;
-  --color-accent-950: #171f15;
+  --color-accent-50: #f0f5ff;
+  --color-accent-100: #dde9ff;
+  --color-accent-200: #b9d3ff;
+  --color-accent-300: #88b4ff;
+  --color-accent-400: #5794ff;
+  --color-accent-500: #2575ff;
+  --color-accent-600: #0a5adb;
+  --color-accent-700: #124aaa;
+  --color-accent-800: #143e88;
+  --color-accent-900: #15366f;
+  --color-accent-950: #081b3d;
   --color-accent: var(--color-accent-400);
-  --color-accent-fg: #161510;
-  --color-accent-soft: rgba(130, 160, 119, 0.16);
+  --color-accent-fg: #00041a;
+  --color-accent-soft: rgba(87, 148, 255, 0.16);
   --color-accent-hover: var(--color-accent-300);
 
-  /* Neutrals — greige (11 stops, dark) */
-  --color-neutral-50: #f5f4ef;
-  --color-neutral-100: #e6e4dc;
-  --color-neutral-200: #bbb8ac;
-  --color-neutral-300: #8e8b7f;
-  --color-neutral-400: #605e54;
-  --color-neutral-500: #444239;
-  --color-neutral-600: #33312a;
-  --color-neutral-700: #272620;
-  --color-neutral-800: #1d1c17;
-  --color-neutral-900: #161510;
-  --color-neutral-950: #0c0b08;
+  /* Neutrals — azul-noite (11 stops, dark) */
+  --color-neutral-50: #e7f0f9;
+  --color-neutral-100: #c8d9ea;
+  --color-neutral-200: #a4bdd6;
+  --color-neutral-300: #85a1c1;
+  --color-neutral-400: #597291;
+  --color-neutral-500: #283f5d;
+  --color-neutral-600: #1b2e46;
+  --color-neutral-700: #122136;
+  --color-neutral-800: #081526;
+  --color-neutral-900: #00041a;
+  --color-neutral-950: #00020f;
 
   /* States (dark) */
-  --color-success: #82a077;
-  --color-success-bg: rgba(130, 160, 119, 0.18);
-  --color-success-fg: #a4ba9a;
-  --color-warning: #d09455;
-  --color-warning-bg: rgba(208, 148, 85, 0.18);
-  --color-warning-fg: #e0ad77;
-  --color-error: #c87263;
-  --color-error-bg: rgba(200, 114, 99, 0.18);
-  --color-error-fg: #d99182;
-  --color-info: #7da9bf;
-  --color-info-bg: rgba(125, 169, 191, 0.18);
-  --color-info-fg: #9bbfd2;
+  --color-success: #33cc85;
+  --color-success-bg: rgba(51, 204, 133, 0.18);
+  --color-success-fg: #90dfba;
+  --color-warning: #f6ae31;
+  --color-warning-bg: rgba(246, 174, 49, 0.18);
+  --color-warning-fg: #f4c471;
+  --color-error: #ee5353;
+  --color-error-bg: rgba(238, 83, 83, 0.18);
+  --color-error-fg: #ef8f8f;
+  --color-info: #35c8e9;
+  --color-info-bg: rgba(53, 200, 233, 0.18);
+  --color-info-fg: #86d7ea;
 
   /* Shadows — heavier in dark */
   --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
@@ -426,7 +430,7 @@
   --input: var(--color-border);
   --ring: var(--color-accent-400);
   /* ---- Agenda · cor de pessoa (tema escuro) ----------------------------
-   * Mais claras e menos saturadas que as do claro: sobre `#161510` a versão
+   * Mais claras e menos saturadas que as do claro: sobre o fundo escuro a versão
    * escura de cada matiz sumiria. Mesma ordem, mesmos nomes.
    */
   --agenda-pessoa-1: #f89080;
@@ -476,7 +480,7 @@
   --color-text-muted: var(--color-text-muted);
   --color-text-subtle: var(--color-text-subtle);
 
-  /* Accent — Sage */
+  /* Accent — azul NM */
   --color-accent: var(--color-accent);
   --color-accent-foreground: var(--color-accent-fg);
   --color-accent-soft: var(--color-accent-soft);
@@ -493,7 +497,7 @@
   --color-accent-900: var(--color-accent-900);
   --color-accent-950: var(--color-accent-950);
 
-  /* Neutrals — greige */
+  /* Neutrals — slate */
   --color-neutral-50: var(--color-neutral-50);
   --color-neutral-100: var(--color-neutral-100);
   --color-neutral-200: var(--color-neutral-200);
@@ -820,7 +824,7 @@
     color: var(--color-accent-50);
   }
 
-  /* Focus ring: Sage 500/400, 2px with offset */
+  /* Focus ring: accent 500/400, 2px with offset */
   :focus-visible {
     outline: 2px solid var(--color-accent-500);
     outline-offset: 2px;
@@ -855,7 +859,7 @@
     }
   }
 
-  /* Scrollbar — subtle greige */
+  /* Scrollbar — subtle neutral */
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--color-neutral-300) transparent;

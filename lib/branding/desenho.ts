@@ -94,10 +94,10 @@ export const LOGOTIPO = {
 
 /**
  * As cores da marca do produto, por tema — os mesmos graus da régua
- * (`regua-do-produto.ts`): sálvia 600/400 para o símbolo, neutro 900/0 para
- * o nome e neutro 600/300 para o "CRM". Copiadas dos SVGs de `docs/brand/`.
+ * (`regua-do-produto.ts`): accent 600/400 para o símbolo, neutro 900/50 para
+ * o nome e neutro 600/300 para o "CRM", na paleta NM.
  */
 export const CORES_DA_MARCA = {
-  claro: { simbolo: "#506d48", nome: "#1c1a16", sufixo: "#5d594f" },
-  escuro: { simbolo: "#82a077", nome: "#f5f4ef", sufixo: "#8e8b7f" },
+  claro: { simbolo: "#0a5adb", nome: "#0f1729", sufixo: "#5a687c" },
+  escuro: { simbolo: "#5794ff", nome: "#e7f0f9", sufixo: "#85a1c1" },
 } as const;

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { PALETTES } from "@/app/design/lib/tokens";
 import {
   CURVA_C,
   ESCADA_L,
@@ -24,12 +25,12 @@ const RAIZ = process.cwd();
 const CSS = fs.readFileSync(path.join(RAIZ, "app/globals.css"), "utf8");
 
 /**
- * Os stops esperados saem do CSS, NÃO de uma cópia colada aqui.
+ * Os stops do produto saem do CSS, NÃO de uma cópia colada aqui.
  *
  * Copiar à mão criaria uma segunda fonte da verdade que envelhece em silêncio: quem
- * mexesse na paleta do design system veria este teste verde contra a paleta de ontem, e
- * a catraca deixaria de calibrar contra a régua. Lendo do arquivo, mudar a Sage quebra
- * este teste — que é exatamente o aviso que se quer.
+ * mexesse na paleta veria este teste verde contra a paleta de ontem. A rampa do produto
+ * (paleta NM) é DERIVADA de `#0a5adb`, então a catraca de calibração — o algoritmo contra
+ * uma rampa desenhada à mão — mede a Sage do laboratório (`PALETTES.sage`).
  */
 /**
  * O bloco `:root` sai por casamento de chaves, e não por `slice` entre duas
@@ -48,7 +49,7 @@ function blocoRoot(css: string): string {
   return css.slice(i, fim);
 }
 
-function stopsSageDoCss(): string[] {
+function stopsDoProdutoNoCss(): string[] {
   const raiz = blocoRoot(CSS);
   return GRAUS.map((g) => {
     const m = new RegExp(`--color-accent-${g}:\\s*(#[0-9a-f]{6})`, "i").exec(raiz);
@@ -103,14 +104,19 @@ describe("conversões de cor", () => {
 });
 
 describe("rampaDeSemente — catraca de calibração contra o design system", () => {
-  const esperados = stopsSageDoCss();
+  const esperados = GRAUS.map((g) => PALETTES.sage.accent[g]);
+  const doProduto = stopsDoProdutoNoCss();
 
   it("lê 11 stops distintos do globals.css (guarda de vacuidade)", () => {
     // Sem isto, um regex quebrado devolveria lista vazia e a comparação abaixo passaria
     // por não ter o que comparar — instrumento morto tem cara de teste verde.
-    expect(esperados).toHaveLength(11);
-    expect(new Set(esperados).size).toBe(11);
-    expect(esperados[K]).toBe("#506d48");
+    expect(doProduto).toHaveLength(11);
+    expect(new Set(doProduto).size).toBe(11);
+    expect(doProduto[K]).toBe("#0a5adb");
+  });
+
+  it("a rampa do produto no globals.css É a derivada de #0a5adb", () => {
+    expect(doProduto).toEqual([...rampaDeSemente("#0a5adb")]);
   });
 
   it("reproduz os 11 stops Sage a partir de #506d48 com Δ ≤ 2/255 por canal", () => {
