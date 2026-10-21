@@ -10,10 +10,11 @@ name: nm-ci
 #
 # Este workflow roda typecheck, lint, lint:channels, lint:role-rank, cercas
 # estruturais e a suíte unitária (`--project produto`) em 3 partes — mesma forma
-# do `verify-parte` de ci.yml — e, na parte 4, o `test:db` (Postgres efêmero +
-# baseline install/update + invariantes, incluindo o isolamento RLS entre duas
-# organizações) e o `test:db:update` (update.sh sobre banco COM dados). O status
-# check obrigatório da `main` é o job `nm-ci-ok`.
+# do `verify-parte` de ci.yml — e, nas partes 4 a 6, o `test:db` (Postgres
+# efêmero + baseline install/update + invariantes, incluindo o isolamento RLS
+# entre duas organizações) dividido em 3, mais o `test:db:update` (update.sh
+# sobre banco COM dados) na parte 4. O status check obrigatório da `main` é o
+# job `nm-ci-ok`.
 #
 # Fora daqui (de propósito, por enquanto): e2e, build de imagem, kit bash
 # (test:shell).
@@ -28,16 +29,66 @@ permissions:
   contents: read
 
 jobs:
-  # Partes: 1 = typecheck + auditorias + unit 1/3; 2 = lint + unit 2/3;
-  # 3 = cercas + unit 3/3; 4 = test:db + test:db:update. `--project produto` é o
-  # `pnpm test:unit` menos as cercas, que rodam uma vez só, na parte 3.
+  # O PR alcança as suítes e o banco? Regra e porquê de cada caminho no
+  # cabeçalho de scripts/nm/pr-alcanca-o-nm-ci.sh. Mesmo desenho do
+  # `e2e-alcance` do upstream: fora de pull_request é SEMPRE `sim` (a `main`
+  # mede tudo), e falha ao listar ou lista cortada (≥3000) também viram `sim`.
   #
-  # A parte 4 mora na MESMA matriz (e não num job novo) para continuar coberta
-  # pelo agregador `nm-ci-ok` sem acrescentar job ao mapa de
-  # tests/unit/gatilho-dos-jobs-de-entrega.test.ts. Teto de 30 min como o
-  # `invariants-majors` do upstream (duas passadas de banco).
+  # O pulo acontece nos PASSOS das partes, nunca num `if:` de job: a parte
+  # pulada termina `success`, declara no log que não mediu, e o `nm-ci-ok`
+  # continua aceitando só `success`. Se ESTE job falhar, as partes não rodam e
+  # o `nm-ci-ok` reprova — falta de medida nunca vira verde.
+  nm-ci-alcance:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      suites: ${{ steps.alcance.outputs.suites }}
+      banco: ${{ steps.alcance.outputs.banco }}
+    steps:
+      - uses: actions/checkout@v7
+        if: github.event_name == 'pull_request'
+        with:
+          sparse-checkout: scripts/nm/pr-alcanca-o-nm-ci.sh
+          sparse-checkout-cone-mode: false
+
+      - name: O PR alcança as suítes e o banco?
+        id: alcance
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          tudo() { printf 'suites=sim\nbanco=sim\n' >> "$GITHUB_OUTPUT"; echo "$1"; exit 0; }
+          [ "${GITHUB_EVENT_NAME}" = "pull_request" ] || tudo "evento ${GITHUB_EVENT_NAME}: roda tudo"
+          arquivos=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[].filename') \
+            || tudo "::warning::não consegui listar os arquivos do PR — roda tudo"
+          n=$(printf '%s\n' "$arquivos" | grep -c . || true)
+          [ "$n" -lt 3000 ] || tudo "${n} arquivos (lista cortada): roda tudo"
+          resposta=$(printf '%s\n' "$arquivos" | bash scripts/nm/pr-alcanca-o-nm-ci.sh) \
+            || tudo "::warning::o script de alcance falhou — roda tudo"
+          suites=sim; banco=sim
+          printf '%s\n' "$resposta" | grep -qx 'suites=nao' && suites=nao
+          printf '%s\n' "$resposta" | grep -qx 'banco=nao' && banco=nao
+          printf 'suites=%s\nbanco=%s\n' "$suites" "$banco" >> "$GITHUB_OUTPUT"
+          echo "${n} arquivo(s) no PR → suites=${suites} banco=${banco}"
+
+  # Partes: 1 = typecheck + auditorias + unit 1/3; 2 = lint + unit 2/3;
+  # 3 = cercas + unit 3/3; 4, 5 e 6 = test:db 1/3, 2/3 e 3/3, e a 4 também roda
+  # o test:db:update. `--project produto` é o `pnpm test:unit` menos as cercas,
+  # que rodam uma vez só, na parte 3.
+  #
+  # O test:db é dividido em 3 porque era o gargalo medido: 17 min dos 18 do CI,
+  # com os 448 arquivos de invariantes em série (`fileParallelism: false`) e só
+  # 20 s de preparo do banco. Cada parte paga o preparo e roda um terço.
+  #
+  # As partes de banco moram na MESMA matriz (e não num job novo) para
+  # continuarem cobertas pelo agregador `nm-ci-ok`. Teto de 30 min como o
+  # `invariants-majors` do upstream.
   verify:
-    timeout-minutes: ${{ matrix.parte == 4 && 30 || 20 }}
+    needs: [nm-ci-alcance]
+    timeout-minutes: ${{ matrix.parte >= 4 && 30 || 20 }}
     runs-on: ubuntu-latest
     # Concurrency por job (não por workflow): o agregador `nm-ci-ok` roda com
     # `if: always()` e, num grupo de workflow, seguraria o grupo — ver o
@@ -48,50 +99,59 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        parte: [1, 2, 3, 4]
+        parte: [1, 2, 3, 4, 5, 6]
     env:
+      # `true` quando esta parte mede algo que o PR alcança (job nm-ci-alcance).
+      MEDE: ${{ (matrix.parte <= 3 && needs.nm-ci-alcance.outputs.suites == 'sim') || (matrix.parte >= 4 && needs.nm-ci-alcance.outputs.banco == 'sim') }}
       # Lida por scripts/test-db.sh e scripts/test-update-com-dados.sh. pg17 é a
       # major do Supabase Cloud onde o NM Connect vai rodar; o piso pg15 segue
       # vigiado pela cerca baseline-no-piso-do-postgres.
       TEST_DB_IMAGE: pgvector/pgvector:pg17
     steps:
+      - name: Esta parte mede o PR?
+        run: |
+          if [ "$MEDE" = "true" ]; then echo "parte ${{ matrix.parte }}: mede"; exit 0; fi
+          echo "::notice::parte ${{ matrix.parte }} PULADA — o PR não alcança o que ela mede (scripts/nm/pr-alcanca-o-nm-ci.sh)"
+
       - uses: actions/checkout@v7
+        if: env.MEDE == 'true'
 
       # Node 22, pnpm da versão em `packageManager` (pnpm/action-setup), cache
       # pnpm e `pnpm install --frozen-lockfile`.
       - uses: ./.github/actions/preparar-node
+        if: env.MEDE == 'true'
         timeout-minutes: 5
 
       - name: Typecheck
-        if: matrix.parte == 1
+        if: env.MEDE == 'true' && matrix.parte == 1
         env:
           NODE_OPTIONS: --max-old-space-size=6144
         run: pnpm typecheck
 
       - name: Channel provider leak
-        if: matrix.parte == 1
+        if: env.MEDE == 'true' && matrix.parte == 1
         run: pnpm lint:channels
 
       - name: Role rank audit
-        if: matrix.parte == 1
+        if: env.MEDE == 'true' && matrix.parte == 1
         run: pnpm lint:role-rank
 
       - name: Lint
-        if: matrix.parte == 2
+        if: env.MEDE == 'true' && matrix.parte == 2
         run: pnpm lint
 
       # Regra DRY (CLAUDE.md › Regras NM): clone em arquivo novo reprova; em
       # arquivo que já existia, só anota. Varre o código todo, ~1min30.
       - name: Duplicação de código (DRY)
-        if: matrix.parte == 2
+        if: env.MEDE == 'true' && matrix.parte == 2
         run: pnpm checar:duplicacao
 
       - name: Cercas estruturais
-        if: matrix.parte == 3
+        if: env.MEDE == 'true' && matrix.parte == 3
         run: pnpm cercas
 
       - name: Unit tests (parte ${{ matrix.parte }}/3)
-        if: matrix.parte != 4
+        if: env.MEDE == 'true' && matrix.parte <= 3
         run: pnpm test:unit --project produto --shard=${{ matrix.parte }}/3
 
       # O test:db confere o update.sh do checkout contra o da ÚLTIMA RELEASE
@@ -101,7 +161,7 @@ jobs:
       # upstream (melgarafael/DeskcommCRM), e as duas tags são buscadas de lá,
       # rasas, antes do script — que só busca no `origin` quando a tag falta.
       - name: Release de referência do upstream (para o test:db)
-        if: matrix.parte == 4
+        if: env.MEDE == 'true' && matrix.parte >= 4
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -113,25 +173,27 @@ jobs:
           echo "CONFERENCIA_KIT_RELEASE=$rel" >> "$GITHUB_ENV"
           echo "release de referência: $rel"
 
-      - name: RLS isolation + governance invariants (test:db)
-        if: matrix.parte == 4
-        run: pnpm test:db
+      - name: RLS isolation + governance invariants (test:db, parte ${{ matrix.parte }})
+        if: env.MEDE == 'true' && matrix.parte >= 4
+        run: pnpm test:db --shard=$(( ${{ matrix.parte }} - 3 ))/3
 
       - name: update.sh sobre banco COM DADOS (test:db:update)
-        if: matrix.parte == 4
+        if: env.MEDE == 'true' && matrix.parte == 4
         run: pnpm test:db:update
 
   # O NOME DESTE JOB É O STATUS CHECK OBRIGATÓRIO. Sem concurrency, de
   # propósito; `skipped` e `cancelled` reprovam — parte que não rodou não mediu.
+  # Parte que o alcance dispensou termina `success` e diz isso no próprio log.
   nm-ci-ok:
     if: always()
-    needs: [verify]
+    needs: [nm-ci-alcance, verify]
     runs-on: ubuntu-latest
     permissions: {}
     steps:
       - name: Falhar se qualquer parte não passou
         env:
+          ALCANCE: ${{ needs.nm-ci-alcance.result }}
           VERIFY: ${{ needs.verify.result }}
         run: |
-          echo "verify: ${VERIFY}"
-          [ "$VERIFY" = "success" ]
+          echo "nm-ci-alcance: ${ALCANCE} | verify: ${VERIFY}"
+          [ "$ALCANCE" = "success" ] && [ "$VERIFY" = "success" ]
