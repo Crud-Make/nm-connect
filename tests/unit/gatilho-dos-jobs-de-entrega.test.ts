@@ -234,6 +234,12 @@ const GATILHO_ESPERADO: Record<string, { condicao: string | null; efeito: string
     condicao: null,
     efeito: "Este é o check obrigatório `build-and-size` (`pnpm build` em Node 22).",
   },
+  "nm-ci.yml::nm-ci-alcance": {
+    condicao: null,
+    efeito:
+      "Decide se o PR alcança as suítes e o banco do nm-ci (scripts/nm/pr-alcanca-o-nm-ci.sh). " +
+      "Uma condição aqui deixaria o job `skipped`, as partes sem rodar e o `nm-ci-ok` vermelho.",
+  },
   "nm-ci.yml::verify": {
     condicao: null,
     efeito:
