@@ -32,6 +32,12 @@
  * Quarta exceção deliberada: `data-*.json` ganharam `processos`, `andamentos` e
  * `andamentos_da_equipe`, vazios, logo depois de `honorarios_parcelas` — as
  * seções do módulo Processos no export (PR 3 do módulo). Nenhuma outra chave mudou.
+ *
+ * Quinta exceção deliberada: `email.json`, `alarmes.json` e
+ * `alarmes-store-redact.json` trocaram SÓ dois hex, porque a paleta do produto
+ * passou a ser a do NM (PR #42) e o texto dos e-mails sai dos neutros da régua
+ * (`lib/branding/saida.ts`): `#1c1a16` → `#0f1729` (texto) e `#7d786c` →
+ * `#6f8095` (suave). Nenhum outro byte mudou.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

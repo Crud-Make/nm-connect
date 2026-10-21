@@ -8,7 +8,7 @@ confiável, sóbrio — atendimento jurídico e empresarial.
 ## O símbolo
 
 Um balão de conversa (cantos retos arredondados, cauda à esquerda) dentro de um
-ladrilho vermelho (`#B3261E`). Dentro do balão, **N e M desenhados num traço único e contínuo**:
+ladrilho azul (`#0A5ADB`). Dentro do balão, **N e M desenhados num traço único e contínuo**:
 a perna direita do N é a perna esquerda do M. Uma linha só, ligando as duas letras —
 a conversa e a conexão. Não usa círculo, telefone nem verde: nada que lembre o logo do
 WhatsApp ou de outra marca da Meta.
@@ -21,19 +21,19 @@ O wordmark é Inter (SIL OFL 1.1) convertida em contornos: **NM** em 700, **Conn
 | Arquivo | Uso |
 |---|---|
 | `logo.svg` / `logo.png` | Logo horizontal para fundo claro (PNG com 192 px de altura, fundo transparente) |
-| `logo-escuro.svg` / `logo-escuro.png` | Logo para fundo escuro ("NM" em `#EF6B63`, "Connect" em `#F2F0EA`) |
+| `logo-escuro.svg` / `logo-escuro.png` | Logo para fundo escuro ("NM" em `#5794FF`, "Connect" em `#E7F0F9`) |
 | `icone.svg` / `icone-512.png` | Símbolo quadrado; legível a 16–32 px (aba, app instalado) |
 | `paleta.md` | Cores, justificativa e contraste WCAG medido |
 | `gerar.py` | Regera os três SVGs (precisa de `fonttools`; instruções no cabeçalho) |
-| `evidencias/` | Telas do sistema com a marca aplicada, claro e escuro; `erro-x-marca-*` comparam a marca com estados de erro e botão destrutivo; `grafite-2B2A27-recusado-*` mostram o grafite neutro recusado |
+| `evidencias/` | Telas da identidade ANTERIOR (vermelho + grafite, 14/10/2026), guardadas como histórico; `grafite-2B2A27-recusado-*` mostram o grafite neutro recusado pela guarda de acromaticidade |
 
 Regras rápidas: não recolorir o símbolo fora da paleta; não esticar (o logo tem
 proporção ~4,8:1 e a barra lateral o mostra com 28 px de altura); manter o ladrilho
-vermelho com balão branco nos dois temas — é o que torna o ícone reconhecível na aba.
+azul com balão branco nos dois temas — é o que torna o ícone reconhecível na aba.
 
-> **Regra de cor:** vermelho `#B3261E` e branco são a marca, só no logo e no ícone. A
-> interface é grafite (`#33363D` / `#C9CDD4`), e o vermelho na interface fica reservado
-> para erro e perigo. Grafite neutro demais (ex.: `#2B2A27`) é recusado pelo sistema, que
+> **Regra de cor:** a marca e a interface usam o mesmo azul, o da paleta do produto
+> (`#0A5ADB` no claro, `#5794FF` no escuro), trazida do NM ONE em 21/10/2026. Vermelho
+> na tela só para erro e perigo. Cor neutra demais (ex.: `#2B2A27`) é recusada pelo sistema, que
 > volta à cor padrão; ver [`paleta.md`](paleta.md).
 
 ## Como aplicar numa instalação
@@ -46,8 +46,8 @@ serve qualquer marca, e o banco manda sobre o `.env`. Nada aqui edita arquivo do
 Entre como super-admin e abra **`/admin/marca`**:
 
 1. **Nome do sistema:** `NM Connect`
-2. **Cor da marca:** `#33363D` (grafite: a interface é grafite; o vermelho fica no logo)
-3. **Cor da marca no tema escuro:** `#C9CDD4`
+2. **Cor da marca:** `#0A5ADB`
+3. **Cor da marca no tema escuro:** `#5794FF`
 4. **Logo:** suba `logo.png` (sobe na hora, não depende do Salvar)
 5. **Logo para o tema escuro:** suba `logo-escuro.png`
 6. **Ícone do aplicativo e do navegador:** suba `icone-512.png`
@@ -64,7 +64,7 @@ e a paleta não precisou de ajuste fino.
 
 ```bash
 APP_NAME="NM Connect"
-APP_ACCENT_HEX=#33363D
+APP_ACCENT_HEX=#0A5ADB
 # Opcional — o logo subido pela tela vence esta URL:
 APP_LOGO_URL=https://raw.githubusercontent.com/Crud-Make/nm-connect/main/marca/nm-connect/logo.png
 ```
